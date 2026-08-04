@@ -30,6 +30,44 @@ public class NetService extends BaseService {
       return this.parsePlayerList("stats");
    }
 
+   public boolean validateApiToken(String token) {
+      HttpsURLConnection connection = null;
+
+      try {
+         connection = this.openJournalConnection(this.journalApiPath + "me", "GET", null);
+         if (connection == null) {
+            return false;
+         }
+
+         connection.setRequestProperty("x-token", sanitizeApiToken(token));
+         connection.setRequestProperty("Content-Type", "application/json");
+         String body = this.readResponseBody(connection);
+         return body != null && !body.isBlank();
+      } catch (IOException ignored) {
+         return false;
+      } finally {
+         if (connection != null) {
+            connection.disconnect();
+         }
+      }
+   }
+
+   public static String sanitizeApiToken(String token) {
+      if (token == null) {
+         return "";
+      }
+
+      token = token.trim();
+      if (token.startsWith("\"") && token.endsWith("\"") && token.length() > 1) {
+         token = token.substring(1, token.length() - 1).trim();
+      }
+
+      token = token.replaceAll("\\s+", "");
+      token = token.replaceAll("[\\u200B-\\u200D\\uFEFF]", "");
+      token = token.replaceAll("§[0-9a-zA-Z]", "");
+      return token;
+   }
+
    public void submitJournalEntry(String username, String reason, String mode, int anarchyNumber, boolean isPvpAnarchy) {
       if (this.ensureSuccess()) {
          ServiceRegistry.getNotificationService().showToast(
@@ -213,7 +251,7 @@ public class NetService extends BaseService {
          ServiceRegistry.getNotificationService().showToast(
             NotificationType.ERROR,
             "§c§lОшибка",
-            "Неверный API токен журнала. Скопируй токен из профиля на journal.holyworld.me и пропиши: §6/hm setapitoken <token>",
+            "Неверный API ключ журнала. Открой §bjournal.holyworld.me/api§f, скопируй §6API ключ§f через кнопку copy (не auth_token из cookies) и пропиши: §6/hm setapitoken <ключ>",
             15.0F
          );
          return;
@@ -228,7 +266,7 @@ public class NetService extends BaseService {
    }
 
    private void configureConnection(@NotNull HttpsURLConnection connection) {
-      String token = ServiceRegistry.getConfigManager().getState().getApiToken().trim();
+      String token = sanitizeApiToken(ServiceRegistry.getConfigManager().getState().getApiToken());
       connection.setRequestProperty("x-token", token);
       connection.setRequestProperty("Content-Type", "application/json");
    }
