@@ -1,66 +1,114 @@
-# HolyModeration — buildable sources
+# HolyModeration
 
-Fabric mod for Minecraft **1.21.11** with Mojang mappings.
+Fabric-мод для модерации на **Minecraft 1.21.11**.
 
-## Requirements
+## Требования
 
-- Java 21+
-- Internet (Gradle downloads Minecraft + Fabric on first run)
+| Компонент | Версия |
+|-----------|--------|
+| Minecraft | 1.21.11 |
+| Fabric Loader | 0.19.3+ |
+| Fabric API | 0.141.6+1.21.11 |
+| Java (для сборки) | 21+ |
 
-## Build
+## Установка
+
+1. Установи [Fabric Loader](https://fabricmc.net/use/) для Minecraft **1.21.11**
+2. Скачай **Fabric API** (`0.141.6+1.21.11`) и положи в `mods/`
+3. Скачай `HolyModeration-2.10alpha.jar` из [Releases](https://github.com/xvdosha-alt/HolyModeration/releases)
+4. Положи JAR в папку `mods/` клиента
+5. Запусти игру
+
+```
+.minecraft/
+  mods/
+    fabric-api-0.141.6+1.21.11.jar
+    HolyModeration-2.10alpha.jar
+```
+
+## Первый запуск
+
+### API-токен журнала
+
+Для работы с журналом проверок нужен токен:
+
+```
+/hm setapitoken <токен>
+```
+
+После установки токена мод попросит перезайти на сервер.
+
+### Конфиг
+
+Настройки сохраняются в:
+
+```
+~/.config/fabric/holymoderation/config.json     # macOS / Linux
+config/holymoderation/config.json               # рядом с игрой (Windows)
+```
+
+Дополнительные файлы:
+
+- `checktwinks.txt` — список игроков для проверки твинков
+- `results.txt` — результат проверки твинков
+- `temp/` — временные файлы
+
+## Основные команды
+
+| Команда | Описание |
+|---------|----------|
+| `/hm` | Справка по командам |
+| `/hm enable` / `/hm disable` | Включить / выключить мод |
+| `/frz <ник>` | Начать проверку (заморозка) |
+| `/unfrz` | Закончить проверку |
+| `/hm startcheckout <ник> <причина>` | Внести проверку в журнал |
+| `/hm endcheckout <результат>` | Завершить проверку в журнале |
+| `/hm twinks` | Проверка твинков |
+| `/hm spy <ник>` | Следить за игроком |
+| `/hm stats` | Статистика проверок |
+| `/hm textadd <текст>` | Добавить авто-текст для проверки |
+| `/hm textslist` | Список авто-текстов |
+
+### Причины проверки (журнал)
+
+`report`, `checkout`, `autobuy`, `autosell`, `customka`, `personal`, `toManyChecks`, `candidate`
+
+### Результаты проверки (журнал)
+
+`clean`, `ban`, `autobuy`, `autosell`
+
+## Как работает проверка
+
+1. `/frz <ник>` — начинается проверка, игрок замораживается
+2. Через несколько секунд в чат приходят кнопки для внесения проверки в журнал
+3. Настроенные авто-тексты отправляются игроку через `/msg`
+4. `/unfrz` — проверка завершается, появляются кнопки:
+   - Закончить с результатом «чистый»
+   - Закончить с «бан» (+/- снос стеша)
+   - Закончить с «автобай» / «автоселл»
+
+## Сборка из исходников
 
 ```bash
+git clone https://github.com/xvdosha-alt/HolyModeration.git
+cd HolyModeration
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 ./gradlew build
 ```
 
-Output JAR:
+Готовый JAR:
 
 ```
 build/libs/HolyModeration-2.10alpha.jar
 ```
 
-Run client:
+Запуск клиента для отладки:
 
 ```bash
 ./gradlew runClient
 ```
 
-## Config paths
+## Внешние сервисы
 
-Cross-platform config directory:
-
-```
-~/.config/fabric/holymoderation/          # macOS/Linux (Fabric config dir)
-config/holymoderation/                    # relative to game directory
-```
-
-Files:
-
-- `config.json` — mod settings
-- `checktwinks.txt` — twinks check input
-- `results.txt` — twinks check output
-- `temp/` — temporary twinks files
-
-## Bundled assets
-
-Sounds are bundled in the mod JAR:
-
-```
-src/main/resources/assets/holymoderation/sounds/
-```
-
-## Versions
-
-| Component | Version |
-|-----------|---------|
-| Minecraft | 1.21.11 |
-| Fabric Loader | 0.19.3 |
-| Fabric API | 0.141.6+1.21.11 |
-| Loom | 1.14.7 |
-| Java | 21 |
-
-## External services
-
-- Journal API: `https://journal.holyworld.me/srv/api/v1/` (requires API token via `/hm setapitoken`)
-- No runtime dependencies on GitHub
+- Journal API: `https://journal.holyworld.me/srv/api/v1/`
+- Требует API-токен (`/hm setapitoken`)
