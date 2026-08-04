@@ -349,7 +349,10 @@ public class CoreModule extends BaseCommandHandler {
          return;
       }
 
-      String token = parts[2];
+      String token = parts[2].trim();
+      if (token.startsWith("\"") && token.endsWith("\"") && token.length() > 1) {
+         token = token.substring(1, token.length() - 1).trim();
+      }
       if (token.isBlank()) {
          this.showError("Вы не ввели токен.");
          return;

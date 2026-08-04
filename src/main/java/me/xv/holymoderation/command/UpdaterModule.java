@@ -52,6 +52,11 @@ public class UpdaterModule extends BaseCommandHandler {
       this.tokenWarningShown = false;
 
       Map<String, Object> profile = this.serviceContext.getNetService().getPlayerHistory();
+      if (profile.isEmpty() || profile.get("rank") == null || profile.get("idVk") == null) {
+         this.serviceContext.getStateService().setBlocked(true);
+         return;
+      }
+
       var state = this.serviceContext.getStateService();
       state.setJournalProfile(profile);
       state.setJournalStats(this.serviceContext.getNetService().getCheckoutSessions());

@@ -184,7 +184,14 @@ public class NetService extends BaseService {
          }
 
          this.configureConnection(connection);
-         return this.parsePlayersFromResponse(this.readResponseBody(connection));
+         String body = this.readResponseBody(connection);
+         if (body == null || body.isBlank()) {
+            return Collections.emptyMap();
+         }
+         return this.parsePlayersFromResponse(body);
+      } catch (IOException exception) {
+         this.showRequestError(path, exception);
+         return Collections.emptyMap();
       } catch (Exception exception) {
          ServiceRegistry.getNotificationService().showToast(
             NotificationType.EXCEPTION,
@@ -200,8 +207,29 @@ public class NetService extends BaseService {
       }
    }
 
+   private void showRequestError(String path, IOException exception) {
+      String message = exception.getMessage() == null ? "" : exception.getMessage();
+      if (message.contains("401")) {
+         ServiceRegistry.getNotificationService().showToast(
+            NotificationType.ERROR,
+            "§c§lОшибка",
+            "Неверный API токен журнала. Скопируй токен из профиля на journal.holyworld.me и пропиши: §6/hm setapitoken <token>",
+            15.0F
+         );
+         return;
+      }
+
+      ServiceRegistry.getNotificationService().showToast(
+         NotificationType.EXCEPTION,
+         "§4§lИсключение",
+         "Исключение в NetService/getResponse (" + path + "): §4" + exception,
+         5.0F
+      );
+   }
+
    private void configureConnection(@NotNull HttpsURLConnection connection) {
-      connection.setRequestProperty("x-token", ServiceRegistry.getConfigManager().getState().getApiToken());
+      String token = ServiceRegistry.getConfigManager().getState().getApiToken().trim();
+      connection.setRequestProperty("x-token", token);
       connection.setRequestProperty("Content-Type", "application/json");
    }
 
@@ -225,10 +253,14 @@ public class NetService extends BaseService {
       }
    }
 
-   public StringBuilder readResponseBody(@NotNull HttpsURLConnection connection) {
-      try (BufferedReader reader = new BufferedReader(
-         new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)
-      )) {
+   public String readResponseBody(@NotNull HttpsURLConnection connection) throws IOException {
+      int responseCode = connection.getResponseCode();
+      java.io.InputStream stream = responseCode >= 400 ? connection.getErrorStream() : connection.getInputStream();
+      if (stream == null) {
+         throw new IOException("Server returned HTTP response code: " + responseCode + " for URL: " + connection.getURL());
+      }
+
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
          StringBuilder response = new StringBuilder();
          String line;
 
@@ -236,22 +268,19 @@ public class NetService extends BaseService {
             response.append(line);
          }
 
-         return response;
-      } catch (Exception exception) {
-         ServiceRegistry.getNotificationService().showToast(
-            NotificationType.EXCEPTION,
-            "§4§lИсключение",
-            "Исключение в NetService/getResponse: §4" + exception,
-            5.0F
-         );
-         return null;
+         if (responseCode >= 400) {
+            throw new IOException("Server returned HTTP response code: " + responseCode + " for URL: " + connection.getURL());
+         }
+
+         return response.toString();
       }
    }
 
-   private Map<String, Object> parsePlayersFromResponse(@NotNull StringBuilder response) {
+   private Map<String, Object> parsePlayersFromResponse(@NotNull String response) {
       try {
          Type type = new TypeToken<Map<String, Object>>() {}.getType();
-         return this.gson.fromJson(response.toString(), type);
+         Map<String, Object> parsed = this.gson.fromJson(response, type);
+         return parsed == null ? Collections.emptyMap() : parsed;
       } catch (Exception exception) {
          ServiceRegistry.getNotificationService().showToast(
             NotificationType.EXCEPTION,
