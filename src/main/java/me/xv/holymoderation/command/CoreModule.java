@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 import me.xv.holymoderation.service.NetService;
 import me.xv.holymoderation.config.ModState;
 import me.xv.holymoderation.event.ChatMessageEvent;
+import me.xv.holymoderation.event.ClientTickEvent;
 import me.xv.holymoderation.event.CommandEvent;
 import me.xv.holymoderation.event.RenderHudEvent;
 import me.xv.holymoderation.event.ServerConnectEvent;
@@ -20,7 +21,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.GameType;
 
 public class CoreModule extends BaseCommandHandler {
-   private boolean awaitingModerPlaytime = false;
 
    @Subscribe(priority = 101)
    public void onServerConnect(ServerConnectEvent event) {
@@ -28,14 +28,13 @@ public class CoreModule extends BaseCommandHandler {
          return;
       }
 
-      this.serviceContext.getNotificationService().clearToasts();
-
       var minecraft = this.serviceContext.getMinecraftService();
       StateService state = this.serviceContext.getStateService();
       if (minecraft.getPlayer() != null) {
          state.setModerNickname(minecraft.getPlayer().getName().getString());
       }
 
+      state.setConnected(true);
       this.onReconnect(event);
 
       if (!state.isOnHW()) {
@@ -65,8 +64,7 @@ public class CoreModule extends BaseCommandHandler {
             if (event.isSwitch()) {
                state.setModerLocation("");
             }
-            this.awaitingModerPlaytime = true;
-            this.serviceContext.getChatService().sendChatOrCommand("/playtime " + state.getModerNickname());
+            this.serviceContext.getChatService().sendChatOrCommand("/find " + state.getModerNickname());
          }
       }
 
@@ -75,6 +73,14 @@ public class CoreModule extends BaseCommandHandler {
       }
 
       state.setGameInitCompleted(true);
+   }
+
+   @Subscribe(priority = 100)
+   public void onClientTick(ClientTickEvent event) {
+      if (this.serviceContext.getStateService().getConnected()) {
+         this.serviceContext.getStateService().setConnected(false);
+         this.serviceContext.getNotificationService().clearToasts();
+      }
    }
 
    @Subscribe(priority = 120)
@@ -177,24 +183,9 @@ public class CoreModule extends BaseCommandHandler {
          state.setInHub(true);
          state.setGameInitCompleted(true);
          state.setModerLocation("");
-         this.awaitingModerPlaytime = false;
       }
 
       ChatService chat = this.serviceContext.getChatService();
-      if (this.awaitingModerPlaytime && chat.isPlaytimeOutputLine(message)) {
-         String location = chat.parsePlaytimeLocation(message);
-         if (location != null) {
-            if (location.equalsIgnoreCase("Оффлайн") || location.toLowerCase().startsWith("lobby")) {
-               state.setModerLocation("");
-            } else {
-               state.setModerLocation(chat.normalizeServerLocation(location));
-            }
-            this.awaitingModerPlaytime = false;
-         }
-         event.setCancelled(true);
-         return;
-      }
-
       if (state.getModerLocation().isEmpty()
          && message.startsWith("Игрок " + state.getModerNickname())
          && message.contains("сервере ")) {
