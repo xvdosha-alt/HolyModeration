@@ -70,6 +70,8 @@ public class ClientPlayNetworkHandlerMixin {
       return command.equals("hm")
          || command.startsWith("hm ")
          || command.equals("frz")
-         || command.startsWith("frz ");
+         || command.startsWith("frz ")
+         || command.equals("freezing")
+         || command.startsWith("freezing ");
    }
 }

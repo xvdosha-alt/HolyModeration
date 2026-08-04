@@ -148,12 +148,20 @@ public final class ModCommands {
       }
 
       dispatcher.register(hm);
+      registerRootPlayerCommand(dispatcher, "frz");
+      registerRootPlayerCommand(dispatcher, "freezing");
+   }
+
+   private static void registerRootPlayerCommand(
+      CommandDispatcher<FabricClientCommandSource> dispatcher,
+      String command
+   ) {
       dispatcher.register(
-         ClientCommandManager.literal("frz")
+         ClientCommandManager.literal(command)
             .then(
                ClientCommandManager.argument("player", StringArgumentType.word())
                   .suggests(ONLINE_PLAYERS)
-                  .executes(ctx -> dispatch("frz " + StringArgumentType.getString(ctx, "player")))
+                  .executes(ctx -> dispatch(command + " " + StringArgumentType.getString(ctx, "player")))
             )
       );
    }
