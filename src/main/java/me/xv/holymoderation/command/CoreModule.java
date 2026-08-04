@@ -1,0 +1,398 @@
+package me.xv.holymoderation.command;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import me.xv.holymoderation.config.ModState;
+import me.xv.holymoderation.event.ChatMessageEvent;
+import me.xv.holymoderation.event.CommandEvent;
+import me.xv.holymoderation.event.RenderHudEvent;
+import me.xv.holymoderation.event.ServerConnectEvent;
+import me.xv.holymoderation.event.Subscribe;
+import me.xv.holymoderation.service.ChatService;
+import me.xv.holymoderation.service.StateService;
+import me.xv.holymoderation.util.NotificationType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.GameType;
+
+public class CoreModule extends BaseCommandHandler {
+   private boolean awaitingModerPlaytime = false;
+
+   @Subscribe(priority = 101)
+   public void onServerConnect(ServerConnectEvent event) {
+      if (event.isSwitch()) {
+         return;
+      }
+
+      this.serviceContext.getNotificationService().clearToasts();
+
+      var minecraft = this.serviceContext.getMinecraftService();
+      StateService state = this.serviceContext.getStateService();
+      if (minecraft.getPlayer() != null) {
+         state.setModerNickname(minecraft.getPlayer().getName().getString());
+      }
+
+      this.onReconnect(event);
+
+      if (!state.isOnHW()) {
+         state.setBlocked(true);
+      } else if (state.getBlocked() && state.getEnabled()) {
+         state.setBlocked(false);
+         this.serviceContext.getEventBus().post(event);
+      }
+   }
+
+   @Subscribe(priority = 100)
+   public void onCoreServerConnect(ServerConnectEvent event) {
+      StateService state = this.serviceContext.getStateService();
+      if (state.getBlocked()) {
+         return;
+      }
+
+      state.setGameInitCompleted(false);
+      Minecraft client = this.serviceContext.getMinecraftService().getClient();
+      if (client.gameMode != null
+         && client.gameMode.getPlayerMode() == GameType.SPECTATOR) {
+         state.setInHub(true);
+         state.setModerLocation("");
+      } else {
+         state.setInHub(false);
+         if (state.getModerLocation().isEmpty() || event.isSwitch()) {
+            if (event.isSwitch()) {
+               state.setModerLocation("");
+            }
+            this.awaitingModerPlaytime = true;
+            this.serviceContext.getChatService().sendChatOrCommand("/playtime " + state.getModerNickname());
+         }
+      }
+
+      if (event.isSwitch() && !state.getInHub()) {
+         this.applyAutoModerSettings(state);
+      }
+
+      state.setGameInitCompleted(true);
+   }
+
+   @Subscribe(priority = 120)
+   public void onGlobalCommand(CommandEvent event) {
+      String command = event.getCommand();
+      String[] parts = command.split(" ");
+      if (!command.startsWith("hm")) {
+         return;
+      }
+
+      if (parts.length == 1) {
+         this.serviceContext.getChatService().sendMessage(
+            Component.literal("§eHolyModeration: §6/hm enable§f, §6/hm stats§f, §6/hm sounds§f, §6/hm setapitoken <token>")
+         );
+         return;
+      }
+
+      String subCommand = parts[1];
+      switch (subCommand) {
+         case "setapitoken":
+            this.handleSetApiTokenCommand(parts);
+            return;
+         case "cleartoasts":
+            this.serviceContext.getNotificationService().clearToasts();
+            this.serviceContext.getChatService().sendMessage(Component.literal("§aУведомления очищены."));
+            return;
+         case "enable":
+            this.handleEnableCommand(this.serviceContext.getStateService());
+            return;
+         case "disable":
+            this.handleDisableCommand(event, this.serviceContext.getStateService());
+            return;
+         default:
+            break;
+      }
+   }
+
+   @Subscribe(priority = 100)
+   public void onCommand(CommandEvent event) {
+      if (!this.serviceContext.getStateService().isOnHW()) {
+         return;
+      }
+
+      StateService state = this.serviceContext.getStateService();
+      if (!state.getGameInitCompleted()) {
+         this.showError("Не спеши, инициализация игры ещё не завершилась!");
+         return;
+      }
+
+      if (state.getCheckingTwinks()) {
+         this.showError("Дождитесь окончания проверки твинков.");
+         event.setCancelled(true);
+         return;
+      }
+
+      String command = event.getCommand();
+      String[] parts = command.split(" ");
+      String subCommand = command.startsWith("hm") ? parts[1] : parts[0];
+      ModState modState = this.serviceContext.getConfigManager().getState();
+
+      switch (subCommand) {
+         case "v":
+            this.handleVanishCommand(parts, state);
+            break;
+         case "gamemode":
+         case "gm":
+            this.handleGamemodeCommand(parts, state);
+            break;
+         case "fly":
+            this.handleFlyCommand(parts, state, modState);
+            break;
+         case "god":
+            this.handleGodCommand(parts, state, modState);
+            break;
+         case "hac":
+            this.handleHacCommand(parts, state, modState, event);
+            break;
+         default:
+            break;
+      }
+   }
+
+   @Subscribe(priority = -100)
+   public void onHmCommand(CommandEvent event) {
+      if (event.getCommand().startsWith("hm")) {
+         event.setCancelled(true);
+      }
+   }
+
+   @Subscribe(priority = 100)
+   public void onChatMessage(ChatMessageEvent event) {
+      String message = this.serviceContext.getChatService().stripFormatting(event.getMessage().getString());
+      if (message == null) {
+         return;
+      }
+
+      StateService state = this.serviceContext.getStateService();
+      if (message.equals("▶ Ожидайте завершения проверки... Пожалуйста, не двигайтесь.")
+         || message.equals("▶ Введите цифры с картинки в чат! Для открытия чата, нажмите <T>")) {
+         state.setInHub(true);
+         state.setGameInitCompleted(true);
+         state.setModerLocation("");
+         this.awaitingModerPlaytime = false;
+      }
+
+      ChatService chat = this.serviceContext.getChatService();
+      if (this.awaitingModerPlaytime && chat.isPlaytimeOutputLine(message)) {
+         String location = chat.parsePlaytimeLocation(message);
+         if (location != null) {
+            if (location.equalsIgnoreCase("Оффлайн") || location.toLowerCase().startsWith("lobby")) {
+               state.setModerLocation("");
+            } else {
+               state.setModerLocation(chat.normalizeServerLocation(location));
+            }
+            this.awaitingModerPlaytime = false;
+         }
+         event.setCancelled(true);
+         return;
+      }
+
+      if (state.getModerLocation().isEmpty()
+         && message.startsWith("Игрок " + state.getModerNickname())
+         && message.contains("сервере ")) {
+         event.setCancelled(true);
+         state.setModerLocation(
+            chat.normalizeServerLocation(message.split("сервере ", 2)[1])
+         );
+      }
+   }
+
+   @Subscribe(priority = 100)
+   public void onRenderHud(RenderHudEvent event) {
+      this.serviceContext.getNotificationService().renderToasts(event.getGuiGraphics());
+   }
+
+   private void onReconnect(ServerConnectEvent event) {
+      ServerData serverInfo = event.getServerData();
+      boolean onHolyWorld = serverInfo.ip.matches("(?i).*hol(l)?yworld.*");
+      this.serviceContext.getStateService().setIsOnHW(onHolyWorld);
+   }
+
+   private void applyAutoModerSettings(StateService state) {
+      ModState modState = this.serviceContext.getConfigManager().getState();
+      Minecraft client = this.serviceContext.getMinecraftService().getClient();
+      state.setVanishEnabled(true);
+      state.setGm3Enabled(client.gameMode.getPlayerMode() == GameType.SPECTATOR);
+
+      if (this.shouldToggleVanish(modState, state)) {
+         this.serviceContext.getChatService().sendChatOrCommand("/v");
+         state.setVanishEnabled(!state.getVanishEnabled());
+      }
+
+      if (this.shouldToggleGm3(modState, state)) {
+         this.serviceContext.getChatService().sendChatOrCommand("/gm 3");
+         state.setGm3Enabled(!state.getGm3Enabled());
+      }
+
+      if (this.shouldToggleFly(modState, state)) {
+         this.serviceContext.getChatService().sendChatOrCommand("/fly");
+         state.setFlyEnabled(!state.getFlyEnabled());
+      }
+
+      if (this.shouldToggleGod(modState, state)) {
+         this.serviceContext.getChatService().sendChatOrCommand("/god");
+         state.setGodEnabled(!state.getGodEnabled());
+      }
+
+      if (this.shouldToggleHacAlerts(modState, state)) {
+         this.serviceContext.getChatService().sendChatOrCommand("/hac alerts");
+         state.setHacAlertsEnabled(!state.getHacAlertsEnabled());
+      }
+   }
+
+   private boolean shouldToggleVanish(ModState modState, StateService state) {
+      return modState.getAutoVanishEnabled() == state.getVanishEnabled();
+   }
+
+   private boolean shouldToggleGm3(ModState modState, StateService state) {
+      return modState.getAutoGm3Enabled() == state.getGm3Enabled();
+   }
+
+   private boolean shouldToggleFly(ModState modState, StateService state) {
+      return (modState.getAutoFlyEnabled() == state.getFlyEnabled()) && !state.getGm3Enabled();
+   }
+
+   private boolean shouldToggleGod(ModState modState, StateService state) {
+      return modState.getAutoGodEnabled() == state.getGodEnabled();
+   }
+
+   private boolean shouldToggleHacAlerts(ModState modState, StateService state) {
+      return modState.getAutoHacAlertsEnabled() == state.getHacAlertsEnabled();
+   }
+
+   private void handleVanishCommand(String[] parts, StateService state) {
+      if (parts.length > 1) {
+         if (parts[1].equals("enable")) {
+            state.setVanishEnabled(true);
+         } else if (parts[1].equals("disable")) {
+            state.setVanishEnabled(false);
+         }
+      }
+      state.setVanishEnabled(!state.getVanishEnabled());
+      this.applyGamemodeArg(parts, state);
+   }
+
+   private void handleGamemodeCommand(String[] parts, StateService state) {
+      this.applyGamemodeArg(parts, state);
+   }
+
+   private void applyGamemodeArg(String[] parts, StateService state) {
+      if (parts.length > 1) {
+         String mode = parts[1];
+         if (mode.equals("3") || mode.equals("spectator")) {
+            state.setGm3Enabled(true);
+         } else if (mode.equals("0") || mode.equals("1") || mode.equals("2")
+            || mode.equals("survival") || mode.equals("creative") || mode.equals("adventure")) {
+            state.setGm3Enabled(false);
+         }
+      }
+   }
+
+   private void handleFlyCommand(String[] parts, StateService state, ModState modState) {
+      if (parts.length > 1) {
+         if (parts[1].equals("enable")) {
+            state.setFlyEnabled(true);
+         } else if (parts[1].equals("disable")) {
+            state.setFlyEnabled(false);
+         }
+      }
+      state.setFlyEnabled(!state.getFlyEnabled());
+   }
+
+   private void handleGodCommand(String[] parts, StateService state, ModState modState) {
+      if (parts.length > 1) {
+         if (parts[1].equals("enable")) {
+            state.setGodEnabled(true);
+         } else if (parts[1].equals("disable")) {
+            state.setGodEnabled(false);
+         }
+      }
+      state.setGodEnabled(!state.getGodEnabled());
+   }
+
+   private void handleHacCommand(String[] parts, StateService state, ModState modState, CommandEvent event) {
+      if (parts.length > 1 && parts[1].equals("alerts")) {
+         state.setHacAlertsEnabled(!state.getHacAlertsEnabled());
+         event.setCancelled(true);
+      }
+   }
+
+   private void handleDisableCommand(CommandEvent event, StateService state) {
+      event.setCancelled(true);
+      state.setEnabled(false);
+      state.setBlocked(true);
+      this.serviceContext.getNotificationService().clearToasts();
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.SUCCESS, "§a§lУспех", "Мод выключен!", 5.0F
+      );
+      this.serviceContext.getChatService().sendMessage(Component.literal("§cМод выключен."));
+   }
+
+   private void handleEnableCommand(StateService state) {
+      state.setEnabled(true);
+      state.setBlocked(false);
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.SUCCESS, "§a§lУспех", "Мод включен!", 5.0F
+      );
+      this.serviceContext.getChatService().sendMessage(Component.literal("§aМод включен."));
+   }
+
+   private void handleSetApiTokenCommand(String[] parts) {
+      if (parts.length < 3) {
+         this.showError("Вы не ввели токен.");
+         return;
+      }
+
+      String token = parts[2];
+      if (token.isBlank()) {
+         this.showError("Вы не ввели токен.");
+         return;
+      }
+
+      if (token.contains(" ")) {
+         this.showError("В API токене обнаружены пробелы, пожалуйста, указывайте его без пробелов.");
+         return;
+      }
+
+      ModState modState = this.serviceContext.getConfigManager().getState();
+      modState.setApiToken(token);
+      this.serviceContext.getConfigManager().save(modState);
+      this.serviceContext.getStateService().setBlocked(false);
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.SUCCESS,
+         "§a§lУспех",
+         "API токен сохранён. Перезайди на сервер.",
+         8.0F
+      );
+      this.serviceContext.getChatService().sendMessage(Component.literal("§aAPI токен сохранён. Перезайди на сервер."));
+      this.serviceContext.getSoundService().playSound("success.wav");
+
+      CompletableFuture.delayedExecutor(2L, TimeUnit.SECONDS).execute(() -> {
+         Minecraft client = this.serviceContext.getMinecraftService().getClient();
+         client.execute(() -> {
+            ClientPacketListener handler = client.getConnection();
+            if (handler != null) {
+               handler.getConnection().disconnect(
+                  Component.literal("§b§lВы успешно установили API токен. Пожалуйста, перезайдите на сервер.")
+               );
+            }
+         });
+      });
+   }
+
+   private void showError(String message) {
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.ERROR, "§c§lОшибка", message, 5.0F
+      );
+      this.serviceContext.getChatService().sendMessage(Component.literal("§c" + message));
+   }
+
+   static {
+   }
+}

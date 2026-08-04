@@ -1,0 +1,436 @@
+package me.xv.holymoderation.command;
+
+import java.awt.Color;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import me.xv.holymoderation.config.ModState;
+import me.xv.holymoderation.event.ChatMessageEvent;
+import me.xv.holymoderation.event.CommandEvent;
+import me.xv.holymoderation.event.RenderHudEvent;
+import me.xv.holymoderation.event.Subscribe;
+import me.xv.holymoderation.service.Render2DService;
+import me.xv.holymoderation.service.StateService;
+import me.xv.holymoderation.util.NotificationType;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import com.mojang.blaze3d.vertex.PoseStack;
+
+public class FreezerModule extends BaseCommandHandler {
+   private static final List<String> CHECKOUT_REASONS = List.of(
+      "report", "checkout", "autobuy", "autosell", "customka", "personal", "toManyChecks", "candidate"
+   );
+   private static final List<String> CHECKOUT_RESULTS = List.of("clean", "ban", "autobuy", "autosell");
+   private static final List<String> DESTROY_STASH_VALUES = List.of("true", "false");
+
+   private final String[] freezerCommands = new String[]{
+      "/freezing", "/frz", "freezing", "frz", "sban", "sendtexts", "unfreezing", "unfrz"
+   };
+   private final String[] apiCommands = new String[]{"endcheckout", "startcheckout"};
+   private boolean banChecking = false;
+   private boolean destroyStash;
+   private boolean messageIsCheckbanInfo;
+   private String banReason;
+   private float coAnim = 0.0F;
+   private float coAnimTarget = 0.0F;
+   private float coCurrentWidth = 1.0F;
+   private float coCurrentHeight = 1.0F;
+   private long checkoutStartMillis = 0L;
+   private String coLastPlayer = "";
+   private boolean coClearDisplayWhenHidden = false;
+
+   @Subscribe
+   public void onFrzCommand(CommandEvent event) {
+      String command = event.getCommand();
+      String[] parts = command.split(" ");
+      if (command.startsWith("hm") && parts.length < 2) {
+         return;
+      }
+
+      String subCommand = command.startsWith("hm") ? parts[1] : "/" + parts[0];
+      var chatService = this.serviceContext.getChatService();
+      if ((chatService.matchesCommand(this.freezerCommands, subCommand)
+            || chatService.matchesCommand(this.apiCommands, subCommand))
+         && this.serviceContext.getStateService().getInHub()) {
+         this.showWarning("В хабе этого делать нельзя.");
+         return;
+      }
+
+      if (chatService.matchesCommand(this.freezerCommands, subCommand)) {
+         this.handleFreezerCommand(event, command, subCommand);
+         return;
+      }
+
+      if (chatService.matchesCommand(this.apiCommands, subCommand)) {
+         this.handleApiCommand(command, subCommand);
+      }
+   }
+
+   private void handleFreezerCommand(CommandEvent event, String command, String subCommand) {
+      switch (subCommand) {
+         case "/freezing":
+         case "/frz":
+            this.handleFreezeCommand(event, command);
+            break;
+         case "unfreezing":
+         case "unfrz":
+            this.handleUnfreezeCommand();
+            break;
+         case "sban":
+            this.handleSbanCommand(command);
+            break;
+         case "freezing":
+         case "frz":
+            this.handleStartCheckoutCommand(command);
+            break;
+         case "sendtexts":
+            this.handleEndCheckoutCommand(command);
+            break;
+         default:
+            break;
+      }
+   }
+
+   private void handleFreezeCommand(CommandEvent event, String command) {
+      event.setCancelled(true);
+      String[] parts = command.split(" ", 2);
+      if (parts.length == 1) {
+         this.showError("Вы не указали ник игрока.");
+         return;
+      }
+
+      String target = parts[1];
+      StateService state = this.serviceContext.getStateService();
+      if (target.equals(state.getPlayer())) {
+         this.showWarning(
+            "Этот игрок находиться у вас на проверке. Для его разморозки используйте §6§6§l/unfreezing§f или §6§6§l/unfrz§f"
+         );
+         return;
+      }
+
+      this.serviceContext.getChatService().sendChatOrCommand("/freezing " + target);
+   }
+
+   private void handleUnfreezeCommand() {
+      if (this.serviceContext.getStateService().getPlayer().isEmpty()) {
+         this.showWarning("Вы никого не проверяете.");
+         return;
+      }
+
+      this.serviceContext.getCheckoutsService().init(this.serviceContext);
+   }
+
+   private void handleSbanCommand(String command) {
+      String[] parts = command.split(" ", 4);
+      if (this.serviceContext.getStateService().getPlayer().isEmpty()) {
+         this.showWarning("Вы никого не проверяете.");
+         return;
+      }
+
+      if (parts.length == 2) {
+         this.showError("Вы не указали время и причину бана.");
+         return;
+      }
+      if (parts.length == 3) {
+         this.showError("Вы не указали причину бана.");
+         return;
+      }
+
+      String duration = parts[2];
+      String reason = "2.4 (" + parts[3] + ")";
+      if (!this.serviceContext.getPunishmentsService().shouldExecutePunishment(
+         "/banip", this.serviceContext.getStateService().getPlayer(), duration, reason, true, this.serviceContext
+      )) {
+         return;
+      }
+
+      this.serviceContext.getCheckoutsService().init(this.serviceContext);
+   }
+
+   private void handleStartCheckoutCommand(String command) {
+      String[] parts = command.split(" ", 3);
+      if (parts.length < 3) {
+         this.showError("Вы не указали ник игрока.");
+         return;
+      }
+
+      if (this.serviceContext.getCheckoutsService().startCheckout(parts[2], this.serviceContext)) {
+         this.setCheckoutStartMillis(parts[2]);
+      }
+   }
+
+   private void handleEndCheckoutCommand(String command) {
+      String[] parts = command.split(" ", 3);
+      if (parts.length == 2) {
+         this.showError("Вы не указали ник игрока.");
+         return;
+      }
+
+      this.serviceContext.getCheckoutsService().endCheckout(parts[2], this.serviceContext);
+   }
+
+   private void handleApiCommand(String command, String subCommand) {
+      if (subCommand.equals("startcheckout")) {
+         this.handleApiStartCheckout(command);
+      } else if (subCommand.equals("endcheckout")) {
+         this.handleApiEndCheckout(command);
+      }
+   }
+
+   private void handleApiStartCheckout(String command) {
+      String[] parts = command.split(" ", 4);
+      if (parts.length == 2) {
+         this.showError("Вы не указали ник игрока и причину проверки.");
+         return;
+      }
+      if (parts.length == 3) {
+         this.showError("Вы не указали причину проверки.");
+         return;
+      }
+
+      String player = parts[2];
+      String reason = parts[3];
+      if (!CHECKOUT_REASONS.contains(reason)) {
+         this.showError("Некорректная причина проверки.");
+         return;
+      }
+
+      String location = this.serviceContext.getStateService().getModerLocation();
+      String mode;
+      if (location.startsWith("lite120")) {
+         mode = "lite120";
+      } else if (location.startsWith("lite")) {
+         mode = "lite";
+      } else if (location.startsWith("classic")) {
+         mode = "classic";
+      } else {
+         mode = "lpvp";
+      }
+
+      CompletableFuture.runAsync(() -> this.submitStartCheckoutJournal(mode, player, reason, location));
+      this.setCheckoutStartMillis(player);
+   }
+
+   private void handleApiEndCheckout(String command) {
+      String[] parts = command.split(" ", 6);
+      if (parts.length == 2) {
+         this.showError("Вы не указали результат проверки.");
+         return;
+      }
+
+      String result = parts[2];
+      if (!CHECKOUT_RESULTS.contains(result)) {
+         this.showError("Некорректный результат проверки.");
+         return;
+      }
+
+      CompletableFuture.runAsync(() -> this.finishEndCheckoutJournal(result, parts));
+      this.hideCheckoutHud();
+   }
+
+   @Subscribe
+   public void onFrzChatMessage(ChatMessageEvent event) {
+      String message = this.serviceContext.getChatService().stripFormatting(event.getMessage().getString());
+      if (message == null) {
+         return;
+      }
+
+      StateService state = this.serviceContext.getStateService();
+      ModState modState = this.serviceContext.getConfigManager().getState();
+
+      if (!state.getPlayer().isEmpty() && modState.getAutoBanEnabled()
+         && message.startsWith("▶ Замороженный игрок " + state.getPlayer())) {
+         this.serviceContext.getPunishmentsService().shouldExecutePunishment(
+            "/banip", state.getPlayer(), "30d", "2.4 (Лив с проверки)", true, this.serviceContext
+         );
+         this.serviceContext.getCheckoutsService().init(this.serviceContext);
+      }
+
+      if (modState.getAutoAnyDeskEnabled() && !state.getPlayer().isEmpty() && message.contains(state.getPlayer())) {
+         this.tryCopyAnyDeskFromPm(message, state.getPlayer());
+         this.tryCopyAnyDeskFromChat(message);
+      }
+
+      if (!this.banChecking) {
+         return;
+      }
+
+      if (message.equals("Цель не забанена!") || message.equals("История не найдена.")) {
+         event.setCancelled(true);
+         this.showError(
+            "Проверка не была закончена, т.к. не удалось определить причину бана игрока. Пожалуйста, допишите причину вручную."
+         );
+         this.banChecking = false;
+      }
+
+      if (message.startsWith("Игрок [")) {
+         this.messageIsCheckbanInfo = true;
+      }
+
+      if (message.startsWith("Причина:")) {
+         this.banReason = message.split("Причина: ")[1].split(" \\| ")[0];
+      }
+
+      if (this.messageIsCheckbanInfo) {
+         event.setCancelled(true);
+      }
+
+      if (message.startsWith("IP бан:")) {
+         this.messageIsCheckbanInfo = false;
+         this.banChecking = false;
+         CompletableFuture.runAsync(this::queueBanJournal);
+      }
+   }
+
+   private void tryCopyAnyDeskFromPm(String message, String player) {
+      if (!message.startsWith("[" + player + " ->")) {
+         return;
+      }
+
+      String code = message.split("я]", 2)[1].replace(" ", "");
+      if (this.serviceContext.getChatService().isFrzCommand(code)
+         && code.length() >= 9 && code.length() <= 11) {
+         this.serviceContext.getChatService().copyToClipboard(code);
+         this.serviceContext.getNotificationService().showToast(
+            NotificationType.SUCCESS, "§a§lУспех", "Скопирован анидеск из лс: " + code, 5.0F
+         );
+      }
+   }
+
+   private void tryCopyAnyDeskFromChat(String message) {
+      String[] chatParts = message.split(":", 2);
+      if (chatParts.length < 2) {
+         return;
+      }
+
+      String code = chatParts[1].replace(" ", "");
+      if (this.serviceContext.getChatService().isFrzCommand(code)
+         && code.length() >= 9 && code.length() <= 11) {
+         this.serviceContext.getChatService().copyToClipboard(code);
+         this.serviceContext.getNotificationService().showToast(
+            NotificationType.SUCCESS, "§a§lУспех", "Скопирован анидеск из чата: " + code, 5.0F
+         );
+      }
+   }
+
+   @Subscribe
+   public void onFrzRenderHud(RenderHudEvent event) {
+      this.coAnim += (this.coAnimTarget - this.coAnim) * 0.15F;
+
+      String player = this.serviceContext.getStateService().getPlayer();
+      if (!this.coLastPlayer.equals(player)) {
+         if (this.coLastPlayer.isEmpty() && !player.isEmpty()) {
+            this.checkoutStartMillis = System.currentTimeMillis();
+            this.coAnimTarget = 1.0F;
+         }
+         if (!this.coLastPlayer.isEmpty() && player.isEmpty()) {
+            this.coAnimTarget = 0.0F;
+            this.coClearDisplayWhenHidden = true;
+         }
+         this.coLastPlayer = player;
+      }
+
+      if (this.coAnim < 0.01F && player.isEmpty()) {
+         return;
+      }
+
+      GuiGraphics graphics = event.getGuiGraphics();
+      Font font = this.serviceContext.getMinecraftService().getClient().font;
+
+      long elapsedSeconds = this.checkoutStartMillis == 0L
+         ? 0L
+         : (System.currentTimeMillis() - this.checkoutStartMillis) / 1000L;
+      String timer = String.format("%d:%02d", elapsedSeconds / 60L, elapsedSeconds % 60L);
+      String displayPlayer = player.isEmpty() ? this.coLastPlayer : player;
+      String label = "Текущая проверка: " + displayPlayer + " | " + timer;
+
+      float boxWidth = font.width(label) + 16.0F;
+      float boxHeight = 9.0F + 12.0F;
+      this.coCurrentWidth += (boxWidth - this.coCurrentWidth) * 0.2F;
+      this.coCurrentHeight += (boxHeight - this.coCurrentHeight) * 0.2F;
+
+      float renderWidth = Math.max(1.0F, this.coCurrentWidth * this.coAnim);
+      float renderHeight = Math.max(1.0F, this.coCurrentHeight * this.coAnim);
+      float centerX = graphics.guiWidth() / 2.0F;
+      float x = centerX - renderWidth / 2.0F;
+      float y = graphics.guiHeight() - 90.0F;
+
+      Color background = new Color(10, 20, 40, 220);
+      Color outline = new Color(60, 120, 220);
+      Render2DService render = this.serviceContext.getRender2DService();
+      render.drawSoftRoundedRectOutline(graphics, x, y, renderWidth, renderHeight, 10.0F, background, outline, 1.5F, 3.0F);
+      render.drawText(font, label, centerX - font.width(label) / 2.0F, y + 6.0F, -1, false, graphics);
+
+      if (this.coAnim < 0.02F && this.coAnimTarget == 0.0F && this.coClearDisplayWhenHidden) {
+         this.checkoutStartMillis = 0L;
+         this.coClearDisplayWhenHidden = false;
+         this.coLastPlayer = "";
+      }
+   }
+
+   private void setCheckoutStartMillis(String player) {
+      this.checkoutStartMillis = System.currentTimeMillis();
+      this.coLastPlayer = player;
+      this.coAnimTarget = 1.0F;
+   }
+
+   private void hideCheckoutHud() {
+      this.coAnimTarget = 0.0F;
+      this.coClearDisplayWhenHidden = true;
+   }
+
+   private void queueBanJournal() {
+      this.serviceContext.getNetService().queueJournalEntry("ban", this.banReason, this.destroyStash);
+   }
+
+   private void finishEndCheckoutJournal(String result, String[] parts) {
+      this.serviceContext.getNetService().queueJournalEntry(result, result, false);
+
+      if (parts.length == 3) {
+         this.showError("Вы не указали ник игрока и необходимость снести стеш.");
+         return;
+      }
+      if (parts.length == 4) {
+         this.showError("Вы не указали необходимость снести стеш.");
+         return;
+      }
+
+      String destroyStashValue = parts[4];
+      if (!DESTROY_STASH_VALUES.contains(destroyStashValue)) {
+         this.showError("Некорректная необходимость снести стеш.");
+         return;
+      }
+
+      this.destroyStash = "true".equals(destroyStashValue);
+      if (parts.length == 5) {
+         this.banChecking = true;
+         this.serviceContext.getChatService().sendChatOrCommand("/checkban " + parts[3]);
+      }
+
+      if (parts.length == 6) {
+         this.serviceContext.getNetService().queueJournalEntry(result, parts[5], this.destroyStash);
+         this.serviceContext.getNetService().queueJournalEntry(result, result, true);
+      }
+   }
+
+   private void submitStartCheckoutJournal(String mode, String player, String reason, String location) {
+      this.serviceContext.getNetService().submitJournalEntry(player, reason, "lite", 1, true);
+      int serverNumber = Integer.parseInt(location.split(mode + "-")[1]);
+      this.serviceContext.getNetService().submitJournalEntry(player, reason, mode, serverNumber, false);
+   }
+
+   private void showWarning(String message) {
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.WARNING, "§6§lПредупреждение", message, 5.0F
+      );
+   }
+
+   private void showError(String message) {
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.ERROR, "§c§lОшибка", message, 5.0F
+      );
+   }
+
+   static {
+   }
+}

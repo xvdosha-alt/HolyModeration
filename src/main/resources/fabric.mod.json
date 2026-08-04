@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "holymoderation",
+  "version": "${version}",
+  "name": "HolyModeration",
+  "description": "An auxiliary mod for moderation on HolyWorld",
+  "authors": [
+    "xv"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "me.xv.holymoderation.core.HolyModerationClient"
+    ],
+    "main": [
+      "me.xv.holymoderation.core.HolyModerationMod"
+    ]
+  },
+  "mixins": [
+    "holymoderation.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "fabric": "*",
+    "minecraft": "1.21.11"
+  }
+}
