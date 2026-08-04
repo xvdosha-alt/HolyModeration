@@ -32,7 +32,7 @@ public class PunishmentsService extends BaseService {
    public boolean shouldExecutePunishment(
       String command, String player, String duration, String reason, boolean appendVk, ServiceContext context
    ) {
-      if (!context.getChatService().isHmCommand(duration)) {
+      if (!context.getChatService().isValidDuration(duration)) {
          context.getNotificationService().showToast(
             NotificationType.ERROR,
             "§c§lОшибка",

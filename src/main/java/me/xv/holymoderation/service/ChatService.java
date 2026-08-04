@@ -47,7 +47,7 @@ public class ChatService extends BaseService {
    };
    public final String[] PlayerCommands = new String[]{"freezing", "frz", "sendtexts", "spy"};
    public final String[] OneArgCommands = new String[]{"setapitoken", "setcopy", "setmarker", "setspydelay", "textadd", "textremove", "setsoundsvolume"};
-   public final String[] TwoArgCommands = new String[]{"sban", "startcheckout", "textedit"};
+   public final String[] TwoArgCommands = new String[]{};
    public final String[] FourArgCommands = new String[]{"endcheckout"};
 
    public void sendChatOrCommand(String text) {
@@ -203,6 +203,19 @@ public class ChatService extends BaseService {
       } catch (Exception ignored) {
          return false;
       }
+   }
+
+   public boolean isValidDuration(String duration) {
+      if (duration == null || duration.length() < 2 || duration.length() > 5) {
+         return false;
+      }
+
+      char lastChar = duration.charAt(duration.length() - 1);
+      if (!String.valueOf(lastChar).matches("(?i)[smhd]")) {
+         return false;
+      }
+
+      return this.isHmCommand(duration.substring(0, duration.length() - 1));
    }
 
    public boolean isFrzCommand(String text) {
