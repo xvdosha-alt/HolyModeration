@@ -4,6 +4,7 @@ import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.event.ChatSendEvent;
 import me.xv.holymoderation.event.CommandEvent;
 import me.xv.holymoderation.event.ServerConnectEvent;
+import me.xv.holymoderation.service.StateService;
 import me.xv.holymoderation.service.TabLocationService;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -58,12 +59,65 @@ public class ClientPlayNetworkHandlerMixin {
       }
 
       String command = normalizeCommand(text);
-      if (!isModCommand(command)) {
+      if (isModCommand(command)) {
+         ServiceRegistry.getEventBus().post(new CommandEvent(command));
+         ci.cancel();
          return;
       }
 
-      ServiceRegistry.getEventBus().post(new CommandEvent(command));
-      ci.cancel();
+      syncTrackedCommandState(command);
+   }
+
+   private static void syncTrackedCommandState(String command) {
+      StateService state = ServiceRegistry.getStateService();
+      String[] parts = command.split(" ");
+      if (parts.length == 0) {
+         return;
+      }
+
+      switch (parts[0]) {
+         case "v":
+            if (parts.length == 1) {
+               state.setVanishEnabled(!state.getVanishEnabled());
+            } else if (parts[1].equals("enable")) {
+               state.setVanishEnabled(true);
+            } else if (parts[1].equals("disable")) {
+               state.setVanishEnabled(false);
+            }
+            break;
+         case "gm":
+         case "gamemode":
+            if (parts.length > 1) {
+               String mode = parts[1];
+               if (mode.equals("3") || mode.equals("spectator")) {
+                  state.setGm3Enabled(true);
+               } else if (mode.equals("0") || mode.equals("1") || mode.equals("2")
+                  || mode.equals("survival") || mode.equals("creative") || mode.equals("adventure")) {
+                  state.setGm3Enabled(false);
+               }
+            }
+            break;
+         case "fly":
+            if (parts.length == 1) {
+               state.setFlyEnabled(!state.getFlyEnabled());
+            } else if (parts.length > 1 && parts[1].equals("enable")) {
+               state.setFlyEnabled(true);
+            } else if (parts.length > 1 && parts[1].equals("disable")) {
+               state.setFlyEnabled(false);
+            }
+            break;
+         case "god":
+            if (parts.length == 1) {
+               state.setGodEnabled(!state.getGodEnabled());
+            } else if (parts.length > 1 && parts[1].equals("enable")) {
+               state.setGodEnabled(true);
+            } else if (parts.length > 1 && parts[1].equals("disable")) {
+               state.setGodEnabled(false);
+            }
+            break;
+         default:
+            break;
+      }
    }
 
    private static String normalizeCommand(String text) {

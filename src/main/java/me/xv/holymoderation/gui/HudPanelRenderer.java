@@ -43,9 +43,28 @@ public final class HudPanelRenderer {
       float width,
       float height,
       HudPanelStyle style,
+      Content content,
+      HudPanelType panelType
+   ) {
+      float x = centerX - width / 2.0F;
+      draw(render, graphics, font, x, y, width, height, style, content);
+      if (panelType != null && HudPanelLayout.isHighlighted(panelType)) {
+         drawMoveOutline(graphics, x, y, width, height);
+      }
+   }
+
+   public static void drawCentered(
+      Render2DService render,
+      GuiGraphics graphics,
+      Font font,
+      float centerX,
+      float y,
+      float width,
+      float height,
+      HudPanelStyle style,
       Content content
    ) {
-      draw(render, graphics, font, centerX - width / 2.0F, y, width, height, style, content);
+      drawCentered(render, graphics, font, centerX, y, width, height, style, content, null);
    }
 
    public static void draw(
@@ -76,6 +95,18 @@ public final class HudPanelRenderer {
       if (content.secondary() != null && !content.secondary().isEmpty()) {
          graphics.drawString(font, ServiceRegistry.getChatService().legacyComponent(content.secondary()), Math.round(innerX), Math.round(textY + font.lineHeight + LINE_GAP), style.secondaryText(), true);
       }
+   }
+
+   private static void drawMoveOutline(GuiGraphics graphics, float x, float y, float width, float height) {
+      int left = Math.round(x);
+      int top = Math.round(y);
+      int right = Math.round(x + width);
+      int bottom = Math.round(y + height);
+      int color = 0x99FFFFFF;
+      graphics.fill(left, top, right, top + 1, color);
+      graphics.fill(left, bottom - 1, right, bottom, color);
+      graphics.fill(left, top, left + 1, bottom, color);
+      graphics.fill(right - 1, top, right, bottom, color);
    }
 
    private static String stripLegacy(String text) {

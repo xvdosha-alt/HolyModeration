@@ -11,24 +11,54 @@ import me.xv.holymoderation.service.ModerPlaytimeService;
 
 public class CheckoutsService extends BaseService {
    public void init(ServiceContext context) {
+      this.completeCheckout(context, true, true, 1000L);
+   }
+
+   public void completeCheckoutAfterLeave(ServiceContext context) {
+      this.completeCheckout(context, false, false, 0L);
+   }
+
+   private void completeCheckout(
+      ServiceContext context,
+      boolean releaseOnServer,
+      boolean showSuccessToast,
+      long finalizeDelayMs
+   ) {
       String player = context.getStateService().getPlayer();
-      if (!player.isEmpty()) {
-         this.releaseCheckoutPlayer(context, player);
+      if (player.isEmpty()) {
+         return;
       }
 
-      ServiceRegistry.getNotificationService().showToast(
-         NotificationType.SUCCESS,
-         "§a§lУспех",
-         "Вы успешно закончили проверку.",
-         5.0F
-      );
+      if (releaseOnServer) {
+         this.releaseCheckoutPlayer(context, player);
+      } else {
+         ServiceRegistry.getDebugLogService().write("checkout", "leave player=" + player);
+         context.getChatService().sendChatOrCommand("/prova");
+         restoreModerAfterCheckout(context);
+      }
+
+      if (showSuccessToast) {
+         ServiceRegistry.getNotificationService().showToast(
+            NotificationType.SUCCESS,
+            "§a§lУспех",
+            "Вы успешно закончили проверку.",
+            5.0F
+         );
+      }
+
       String finalizedPlayer = new String(player.toCharArray());
-      context.getSchedulerService().getExecutor().schedule(
-         () -> finalizeCheckout(context, finalizedPlayer),
-         1L,
-         TimeUnit.SECONDS
-      );
       context.getStateService().setPlayer("");
+
+      Runnable finalizeTask = () -> finalizeCheckout(context, finalizedPlayer);
+      if (finalizeDelayMs <= 0L) {
+         finalizeTask.run();
+      } else {
+         context.getSchedulerService().getExecutor().schedule(
+            finalizeTask,
+            finalizeDelayMs,
+            TimeUnit.MILLISECONDS
+         );
+      }
    }
 
    public boolean releaseActiveCheckout(ServiceContext context) {
@@ -46,6 +76,10 @@ public class CheckoutsService extends BaseService {
       ServiceRegistry.getDebugLogService().write("checkout", "release player=" + player + " cmd=/freezing");
       context.getChatService().sendChatOrCommand("/freezing " + player);
       context.getChatService().sendChatOrCommand("/prova");
+      restoreModerAfterCheckout(context);
+   }
+
+   private static void restoreModerAfterCheckout(ServiceContext context) {
       if (context.getConfigManager().getState().getAutoVanishEnabled()
          && !context.getStateService().getVanishEnabled()) {
          context.getChatService().sendChatOrCommand("/v");

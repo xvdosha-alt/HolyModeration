@@ -1,5 +1,6 @@
 package me.xv.holymoderation.core;
 
+import me.xv.holymoderation.gui.HudPanelDragSetup;
 import me.xv.holymoderation.command.ModCommands;
 import me.xv.holymoderation.command.CoreModule;
 import me.xv.holymoderation.command.FreezerModule;
@@ -50,6 +51,7 @@ public class HolyModerationClient implements ClientModInitializer {
          LoggerFactory.getLogger("HolyModeration/Client")
       );
       this.registerModules();
+      HudPanelDragSetup.register();
       ClientCommandRegistrationCallback.EVENT.register(ModCommands::register);
       ServiceRegistry.getDebugLogService().write("system", "log file: " + ServiceRegistry.getDebugLogService().getLogPath());
       ServiceRegistry.getLoggerService().logger().info("HolyModerationClient has been initialized");

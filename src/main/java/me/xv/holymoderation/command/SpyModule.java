@@ -8,8 +8,10 @@ import me.xv.holymoderation.event.CommandEvent;
 import me.xv.holymoderation.event.RenderHudEvent;
 import me.xv.holymoderation.event.ServerConnectEvent;
 import me.xv.holymoderation.event.Subscribe;
+import me.xv.holymoderation.gui.HudPanelLayout;
 import me.xv.holymoderation.gui.HudPanelRenderer;
 import me.xv.holymoderation.gui.HudPanelStyle;
+import me.xv.holymoderation.gui.HudPanelType;
 import me.xv.holymoderation.service.ChatService;
 import me.xv.holymoderation.service.DebugLogService;
 import me.xv.holymoderation.service.Render2DService;
@@ -298,19 +300,27 @@ public class SpyModule extends BaseCommandHandler {
 
       float renderWidth = Math.max(1.0F, this.currentWidth * this.anim);
       float renderHeight = Math.max(1.0F, this.currentHeight * this.anim);
-      float centerX = graphics.guiWidth() / 2.0F;
-      float y = 28.0F;
+      float screenWidth = graphics.guiWidth();
+      float screenHeight = graphics.guiHeight();
+      HudPanelLayout.Bounds bounds = HudPanelLayout.resolve(
+         HudPanelType.SPY,
+         screenWidth,
+         screenHeight,
+         renderWidth,
+         renderHeight
+      );
 
       HudPanelRenderer.drawCentered(
          render,
          graphics,
          font,
-         centerX,
-         y,
+         bounds.centerX(),
+         bounds.topY(),
          renderWidth,
          renderHeight,
          HudPanelStyle.spy(),
-         content
+         content,
+         HudPanelType.SPY
       );
 
       if (this.anim < 0.02F && this.animTarget == 0.0F && this.clearDisplayWhenHidden) {

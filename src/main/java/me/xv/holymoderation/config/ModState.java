@@ -26,6 +26,14 @@ public class ModState {
    @Expose
    private String playerMarker = "§d§l[CHECK]";
    @Expose
+   private Float spyHudCenterX;
+   @Expose
+   private Float spyHudTopY;
+   @Expose
+   private Float checkoutHudCenterX;
+   @Expose
+   private Float checkoutHudTopY;
+   @Expose
    private final List<String> textsList = new ArrayList<>();
    @Expose
    private boolean autoVanishEnabled = true;
@@ -110,6 +118,26 @@ public class ModState {
    @Generated
    public String getPlayerMarker() {
       return this.playerMarker;
+   }
+
+   @Generated
+   public Float getSpyHudCenterX() {
+      return this.spyHudCenterX;
+   }
+
+   @Generated
+   public Float getSpyHudTopY() {
+      return this.spyHudTopY;
+   }
+
+   @Generated
+   public Float getCheckoutHudCenterX() {
+      return this.checkoutHudCenterX;
+   }
+
+   @Generated
+   public Float getCheckoutHudTopY() {
+      return this.checkoutHudTopY;
    }
 
    @Generated
@@ -200,6 +228,26 @@ public class ModState {
    @Generated
    public void setPlayerMarker(String text) {
       this.playerMarker = text;
+   }
+
+   @Generated
+   public void setSpyHudCenterX(Float value) {
+      this.spyHudCenterX = value;
+   }
+
+   @Generated
+   public void setSpyHudTopY(Float value) {
+      this.spyHudTopY = value;
+   }
+
+   @Generated
+   public void setCheckoutHudCenterX(Float value) {
+      this.checkoutHudCenterX = value;
+   }
+
+   @Generated
+   public void setCheckoutHudTopY(Float value) {
+      this.checkoutHudTopY = value;
    }
 
    @Generated

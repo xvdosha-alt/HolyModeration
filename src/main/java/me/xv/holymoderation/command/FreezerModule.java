@@ -9,8 +9,10 @@ import me.xv.holymoderation.event.CommandEvent;
 import me.xv.holymoderation.event.RenderHudEvent;
 import me.xv.holymoderation.event.Subscribe;
 import me.xv.holymoderation.core.ServiceRegistry;
+import me.xv.holymoderation.gui.HudPanelLayout;
 import me.xv.holymoderation.gui.HudPanelRenderer;
 import me.xv.holymoderation.gui.HudPanelStyle;
+import me.xv.holymoderation.gui.HudPanelType;
 import me.xv.holymoderation.service.Render2DService;
 import me.xv.holymoderation.service.StateService;
 import me.xv.holymoderation.service.ModerLocationResolver;
@@ -273,12 +275,22 @@ public class FreezerModule extends BaseCommandHandler {
       StateService state = this.serviceContext.getStateService();
       ModState modState = this.serviceContext.getConfigManager().getState();
 
-      if (!state.getPlayer().isEmpty() && modState.getAutoBanEnabled()
-         && message.startsWith("▶ Замороженный игрок " + state.getPlayer())) {
-         this.serviceContext.getPunishmentsService().shouldExecutePunishment(
-            "/banip", state.getPlayer(), "30d", "2.4 (Лив с проверки)", true, this.serviceContext
+      if (!state.getPlayer().isEmpty() && this.isCheckoutPlayerLeave(message, state.getPlayer())) {
+         String checkoutPlayer = state.getPlayer();
+         ServiceRegistry.getDebugLogService().write("checkout", "detected leave player=" + checkoutPlayer);
+         this.serviceContext.getNotificationService().showToast(
+            NotificationType.WARNING,
+            "§6§lПредупреждение",
+            "Игрок " + checkoutPlayer + " покинул сервер. Выберите результат проверки.",
+            5.0F
          );
-         this.serviceContext.getCheckoutsService().init(this.serviceContext);
+         if (modState.getAutoBanEnabled()) {
+            this.serviceContext.getPunishmentsService().shouldExecutePunishment(
+               "/banip", checkoutPlayer, "30d", "2.4 (Лив с проверки)", true, this.serviceContext
+            );
+         }
+         this.hideCheckoutHud();
+         this.serviceContext.getCheckoutsService().completeCheckoutAfterLeave(this.serviceContext);
       }
 
       if (modState.getAutoAnyDeskEnabled() && !state.getPlayer().isEmpty() && message.contains(state.getPlayer())) {
@@ -391,19 +403,27 @@ public class FreezerModule extends BaseCommandHandler {
 
       float renderWidth = Math.max(1.0F, this.coCurrentWidth * this.coAnim);
       float renderHeight = Math.max(1.0F, this.coCurrentHeight * this.coAnim);
-      float centerX = graphics.guiWidth() / 2.0F;
-      float y = graphics.guiHeight() - renderHeight - 92.0F;
+      float screenWidth = graphics.guiWidth();
+      float screenHeight = graphics.guiHeight();
+      HudPanelLayout.Bounds bounds = HudPanelLayout.resolve(
+         HudPanelType.CHECKOUT,
+         screenWidth,
+         screenHeight,
+         renderWidth,
+         renderHeight
+      );
 
       HudPanelRenderer.drawCentered(
          render,
          graphics,
          font,
-         centerX,
-         y,
+         bounds.centerX(),
+         bounds.topY(),
          renderWidth,
          renderHeight,
          HudPanelStyle.checkout(),
-         content
+         content,
+         HudPanelType.CHECKOUT
       );
 
       if (this.coAnim < 0.02F && this.coAnimTarget == 0.0F && this.coClearDisplayWhenHidden) {
@@ -422,6 +442,29 @@ public class FreezerModule extends BaseCommandHandler {
    private void hideCheckoutHud() {
       this.coAnimTarget = 0.0F;
       this.coClearDisplayWhenHidden = true;
+   }
+
+   private boolean isCheckoutPlayerLeave(String message, String player) {
+      if (player.isEmpty()) {
+         return false;
+      }
+
+      if (message.startsWith("▶ Замороженный игрок " + player)) {
+         return true;
+      }
+
+      if (!message.contains(player)) {
+         return false;
+      }
+
+      String lower = message.toLowerCase();
+      boolean leaveHint = lower.contains("покинул")
+         || lower.contains("вышел")
+         || lower.contains("отключ")
+         || lower.contains("disconnect")
+         || lower.contains("лив");
+      boolean checkoutHint = lower.contains("заморож") || lower.contains("провер");
+      return leaveHint && checkoutHint;
    }
 
    private void queueBanJournal() {
