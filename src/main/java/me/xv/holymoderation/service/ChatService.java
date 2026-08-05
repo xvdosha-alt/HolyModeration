@@ -130,6 +130,15 @@ public class ChatService extends BaseService {
    }
 
    public String escapeCommandArg(String text) {
+      if (text.matches("(?i)lite120-anarchy-(\\d+)")) {
+         return "lite120-" + text.replaceAll("(?i)lite120-anarchy-", "");
+      }
+      if (text.matches("(?i)lite-anarchy-(\\d+)")) {
+         return "lite-" + text.replaceAll("(?i)lite-anarchy-", "");
+      }
+      if (text.matches("(?i)classic-anarchy-(\\d+)")) {
+         return "classic-" + text.replaceAll("(?i)classic-anarchy-", "");
+      }
       if (text.equals("l2anarchy")) {
          return "lite120-1";
       }
@@ -154,14 +163,19 @@ public class ChatService extends BaseService {
       return text.toLowerCase();
    }
 
+   public boolean isPlaytimeBlockLine(String message) {
+      return message.contains("PlayTimeAPI") || message.matches("-{10,}.*");
+   }
+
    public boolean isPlaytimeOutputLine(String message) {
-      return message.startsWith("----------")
+      return this.isPlaytimeBlockLine(message)
          || message.startsWith("Текущая")
-         || message.startsWith("Последняя")
+         || message.startsWith("Последняя активность")
          || message.startsWith("Последний")
-         || message.startsWith("Активность")
+         || message.startsWith("Активность ")
          || message.startsWith("Общее время")
-         || message.startsWith("Время")
+         || message.startsWith("Время бездействия")
+         || message.startsWith("Игрок:")
          || message.isEmpty();
    }
 
@@ -176,8 +190,14 @@ public class ChatService extends BaseService {
       }
 
       String location = parts[1].trim();
-      if (location.length() >= 2 && location.charAt(0) == '[' && location.charAt(location.length() - 1) == ']') {
-         location = location.substring(1, location.length() - 1).trim();
+      if (location.length() >= 2) {
+         char first = location.charAt(0);
+         char last = location.charAt(location.length() - 1);
+         if (first == '(' && last == ')') {
+            location = location.substring(1, location.length() - 1).trim();
+         } else if (first == '[' && last == ']') {
+            location = location.substring(1, location.length() - 1).trim();
+         }
       }
 
       return location;

@@ -32,11 +32,16 @@ public class MessageHandlerMixin {
          ? message.removeUnsignedContent()
          : message;
       Component content = bound.decorate(filtered.decoratedContent());
-      this.dispatch(content, false, ci);
+      this.dispatch(content, false, ci, profile.name());
    }
 
    private void dispatch(Component message, boolean overlay, CallbackInfo ci) {
+      this.dispatch(message, overlay, ci, "");
+   }
+
+   private void dispatch(Component message, boolean overlay, CallbackInfo ci, String senderName) {
       ChatMessageEvent event = new ChatMessageEvent(message);
+      event.setSenderName(senderName);
       ServiceRegistry.getEventBus().post(event);
       ci.cancel();
       if (event.isCancelled()) {

@@ -9,7 +9,9 @@
     "InGameHudMixin",
     "KeyboardMixin",
     "MessageHandlerMixin",
-    "MinecraftClientMixin"
+    "MinecraftClientMixin",
+    "AvatarRendererMixin",
+    "PlayerTabOverlayMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -5,6 +5,7 @@ import net.minecraft.network.chat.Component;
 
 public class ChatMessageEvent extends BaseEvent {
    private Component message;
+   private String senderName = "";
 
    public ChatMessageEvent(Component message) {
       this.message = message;
@@ -18,5 +19,15 @@ public class ChatMessageEvent extends BaseEvent {
    @Generated
    public void setMessage(Component message) {
       this.message = message;
+   }
+
+   @Generated
+   public String getSenderName() {
+      return this.senderName;
+   }
+
+   @Generated
+   public void setSenderName(String senderName) {
+      this.senderName = senderName == null ? "" : senderName;
    }
 }

@@ -63,22 +63,32 @@ public class CheckoutsService extends BaseService {
          context.getChatService().sendChatOrCommand("/warp logo");
       }
       context.getChatService().sendChatOrCommand("/prova");
-      context.getSchedulerService().getExecutor().schedule(
-         () -> this.onCheckoutTick(context),
-         5L,
-         TimeUnit.SECONDS
-      );
+      this.scheduleCheckoutStart(context);
+      return true;
+   }
+
+   private void scheduleCheckoutStart(ServiceContext context) {
+      List<String> textsList = context.getConfigManager().getState().getTextsList();
+      long startDelay = textsList.isEmpty() ? 0L : 5L;
+      TimeUnit startUnit = textsList.isEmpty() ? TimeUnit.MILLISECONDS : TimeUnit.SECONDS;
+
+      context.getSchedulerService().getExecutor().schedule(() -> {
+         if (context.getStateService().getPlayer().isEmpty()) {
+            return;
+         }
+
+         if (!textsList.isEmpty()) {
+            this.endCheckout(context.getStateService().getPlayer(), context);
+         }
+
+         broadcastCheckout(context);
+      }, startDelay, startUnit);
+
       context.getSchedulerService().getExecutor().schedule(
          () -> scheduleCheckoutTimeout(context),
          8L,
          TimeUnit.SECONDS
       );
-      context.getSchedulerService().getExecutor().schedule(
-         () -> broadcastCheckout(context),
-         9L,
-         TimeUnit.SECONDS
-      );
-      return true;
    }
 
    public void endCheckout(String player, ServiceContext context) {
@@ -179,11 +189,6 @@ public class CheckoutsService extends BaseService {
       }
    }
 
-   private void onCheckoutTick(ServiceContext context) {
-      if (!context.getStateService().getPlayer().isEmpty()) {
-         this.endCheckout(context.getStateService().getPlayer(), context);
-      }
-   }
 
    private static void finalizeCheckout(ServiceContext context, String player) {
       sendClickableMessages(context, new String[][]{

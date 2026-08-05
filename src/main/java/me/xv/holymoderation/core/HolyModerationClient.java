@@ -16,6 +16,7 @@ import me.xv.holymoderation.config.ConfigManager;
 import me.xv.holymoderation.event.EventBus;
 import me.xv.holymoderation.service.ChatService;
 import me.xv.holymoderation.service.CheckoutsService;
+import me.xv.holymoderation.service.DebugLogService;
 import me.xv.holymoderation.service.KeyBindingService;
 import me.xv.holymoderation.service.MinecraftService;
 import me.xv.holymoderation.service.NetService;
@@ -36,6 +37,7 @@ public class HolyModerationClient implements ClientModInitializer {
          new EventBus(),
          new ChatService(),
          new CheckoutsService(),
+         new DebugLogService(),
          new KeyBindingService(),
          new MinecraftService(),
          new NetService(),
@@ -49,6 +51,7 @@ public class HolyModerationClient implements ClientModInitializer {
       );
       this.registerModules();
       ClientCommandRegistrationCallback.EVENT.register(ModCommands::register);
+      ServiceRegistry.getDebugLogService().write("system", "log file: " + ServiceRegistry.getDebugLogService().getLogPath());
       ServiceRegistry.getLoggerService().logger().info("HolyModerationClient has been initialized");
    }
 

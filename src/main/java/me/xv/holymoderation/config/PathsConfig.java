@@ -32,4 +32,8 @@ public final class PathsConfig {
    public static Path tempFile() {
       return tempDir().resolve("temp.txt");
    }
+
+   public static Path debugLogFile() {
+      return ROOT.resolve("hm-debug.log");
+   }
 }

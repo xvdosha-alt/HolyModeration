@@ -5,6 +5,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import me.xv.holymoderation.service.NetService;
 import me.xv.holymoderation.config.ModState;
+import me.xv.holymoderation.core.ServiceRegistry;
+import me.xv.holymoderation.service.DebugLogService;
 import me.xv.holymoderation.event.ChatMessageEvent;
 import me.xv.holymoderation.event.ClientTickEvent;
 import me.xv.holymoderation.event.CommandEvent;
@@ -112,6 +114,9 @@ public class CoreModule extends BaseCommandHandler {
             return;
          case "disable":
             this.handleDisableCommand(event, this.serviceContext.getStateService());
+            return;
+         case "debug":
+            this.handleDebugCommand(parts);
             return;
          default:
             break;
@@ -389,6 +394,37 @@ public class CoreModule extends BaseCommandHandler {
             }));
          });
       });
+   }
+
+   private void handleDebugCommand(String[] parts) {
+      DebugLogService debug = ServiceRegistry.getDebugLogService();
+      if (parts.length == 2) {
+         this.serviceContext.getChatService().sendMessage(Component.literal(
+            "§eHolyModeration debug: §6/hm debug on§f, §6/hm debug off§f, §6/hm debug clear§f, §6/hm debug path"
+         ));
+         return;
+      }
+
+      switch (parts[2]) {
+         case "on":
+            debug.setEnabled(true);
+            this.serviceContext.getChatService().sendMessage(Component.literal("§aDebug-лог включён."));
+            break;
+         case "off":
+            debug.setEnabled(false);
+            this.serviceContext.getChatService().sendMessage(Component.literal("§cDebug-лог выключен."));
+            break;
+         case "clear":
+            debug.clear();
+            this.serviceContext.getChatService().sendMessage(Component.literal("§aDebug-лог очищен."));
+            break;
+         case "path":
+            this.serviceContext.getChatService().sendMessage(Component.literal("§b" + debug.getLogPath()));
+            break;
+         default:
+            this.serviceContext.getChatService().sendMessage(Component.literal("§cНеизвестный аргумент. Используй on, off, clear или path."));
+            break;
+      }
    }
 
    private void showError(String message) {

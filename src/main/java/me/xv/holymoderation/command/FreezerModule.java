@@ -108,6 +108,13 @@ public class FreezerModule extends BaseCommandHandler {
          return;
       }
 
+      if (state.getPlayer().isEmpty()) {
+         if (this.serviceContext.getCheckoutsService().startCheckout(target, this.serviceContext)) {
+            this.setCheckoutStartMillis(target);
+         }
+         return;
+      }
+
       this.serviceContext.getChatService().sendChatOrCommand("/freezing " + target);
    }
 
@@ -385,39 +392,45 @@ public class FreezerModule extends BaseCommandHandler {
    }
 
    private void finishEndCheckoutJournal(String result, String[] parts) {
-      this.serviceContext.getNetService().queueJournalEntry(result, result, false);
+      if ("ban".equals(result)) {
+         if (parts.length < 5) {
+            this.showError("Вы не указали ник игрока и необходимость снести стеш.");
+            return;
+         }
 
-      if (parts.length == 3) {
-         this.showError("Вы не указали ник игрока и необходимость снести стеш.");
-         return;
-      }
-      if (parts.length == 4) {
-         this.showError("Вы не указали необходимость снести стеш.");
-         return;
-      }
+         String destroyStashValue = parts[4];
+         if (!DESTROY_STASH_VALUES.contains(destroyStashValue)) {
+            this.showError("Некорректная необходимость снести стеш.");
+            return;
+         }
 
-      String destroyStashValue = parts[4];
-      if (!DESTROY_STASH_VALUES.contains(destroyStashValue)) {
-         this.showError("Некорректная необходимость снести стеш.");
-         return;
-      }
-
-      this.destroyStash = "true".equals(destroyStashValue);
-      if (parts.length == 5) {
+         this.destroyStash = "true".equals(destroyStashValue);
          this.banChecking = true;
          this.serviceContext.getChatService().sendChatOrCommand("/checkban " + parts[3]);
+
+         if (parts.length >= 6) {
+            this.serviceContext.getNetService().queueJournalEntry(result, parts[5], this.destroyStash);
+         }
+         return;
       }
 
-      if (parts.length == 6) {
-         this.serviceContext.getNetService().queueJournalEntry(result, parts[5], this.destroyStash);
-         this.serviceContext.getNetService().queueJournalEntry(result, result, true);
-      }
+      this.serviceContext.getNetService().queueJournalEntry(result, result, false);
    }
 
    private void submitStartCheckoutJournal(String mode, String player, String reason, String location) {
-      this.serviceContext.getNetService().submitJournalEntry(player, reason, "lite", 1, true);
-      int serverNumber = Integer.parseInt(location.split(mode + "-")[1]);
-      this.serviceContext.getNetService().submitJournalEntry(player, reason, mode, serverNumber, false);
+      int serverNumber = 1;
+      if (location != null && !location.isBlank()) {
+         int dashIndex = location.lastIndexOf('-');
+         if (dashIndex >= 0 && dashIndex + 1 < location.length()) {
+            try {
+               serverNumber = Integer.parseInt(location.substring(dashIndex + 1));
+            } catch (NumberFormatException ignored) {
+            }
+         }
+      }
+
+      boolean isPvpAnarchy = "lpvp".equals(mode);
+      this.serviceContext.getNetService().submitJournalEntry(player, reason, mode, serverNumber, isPvpAnarchy);
    }
 
    private void showWarning(String message) {

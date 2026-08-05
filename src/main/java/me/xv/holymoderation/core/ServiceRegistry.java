@@ -5,6 +5,7 @@ import me.xv.holymoderation.config.ConfigManager;
 import me.xv.holymoderation.event.EventBus;
 import me.xv.holymoderation.service.ChatService;
 import me.xv.holymoderation.service.CheckoutsService;
+import me.xv.holymoderation.service.DebugLogService;
 import me.xv.holymoderation.service.KeyBindingService;
 import me.xv.holymoderation.service.LoggerService;
 import me.xv.holymoderation.service.MinecraftService;
@@ -22,6 +23,7 @@ public class ServiceRegistry {
    private static EventBus eventBus;
    private static ChatService chatService;
    private static CheckoutsService checkoutsService;
+   private static DebugLogService debugLogService;
    private static KeyBindingService keyBindingService;
    private static MinecraftService minecraftService;
    private static NetService netService;
@@ -38,6 +40,7 @@ public class ServiceRegistry {
       EventBus eventBus,
       ChatService chatService,
       CheckoutsService checkoutsService,
+      DebugLogService debugLogService,
       KeyBindingService keyBindingService,
       MinecraftService minecraftService,
       NetService netService,
@@ -53,6 +56,7 @@ public class ServiceRegistry {
       ServiceRegistry.eventBus = eventBus;
       ServiceRegistry.chatService = chatService;
       ServiceRegistry.checkoutsService = checkoutsService;
+      ServiceRegistry.debugLogService = debugLogService;
       ServiceRegistry.keyBindingService = keyBindingService;
       ServiceRegistry.minecraftService = minecraftService;
       ServiceRegistry.netService = netService;
@@ -71,6 +75,7 @@ public class ServiceRegistry {
       eventBus.setLogger(loggerService);
       chatService.init(loggerService);
       checkoutsService.init(loggerService);
+      debugLogService.init(loggerService);
       keyBindingService.init(loggerService);
       minecraftService.init(loggerService);
       netService.init(loggerService);
@@ -146,6 +151,11 @@ public class ServiceRegistry {
    @Generated
    public static StateService getStateService() {
       return stateService;
+   }
+
+   @Generated
+   public static DebugLogService getDebugLogService() {
+      return debugLogService;
    }
 
    @Generated

@@ -2,12 +2,15 @@ package me.xv.holymoderation.command;
 
 import java.awt.Color;
 import java.util.concurrent.TimeUnit;
+import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.event.ChatMessageEvent;
 import me.xv.holymoderation.event.ClientTickEvent;
 import me.xv.holymoderation.event.CommandEvent;
 import me.xv.holymoderation.event.RenderHudEvent;
 import me.xv.holymoderation.event.ServerConnectEvent;
 import me.xv.holymoderation.event.Subscribe;
+import me.xv.holymoderation.service.ChatService;
+import me.xv.holymoderation.service.DebugLogService;
 import me.xv.holymoderation.service.Render2DService;
 import me.xv.holymoderation.service.StateService;
 import me.xv.holymoderation.util.NotificationType;
@@ -30,6 +33,11 @@ public class SpyModule extends BaseCommandHandler {
    private String display0 = "";
    private String display1 = "";
    private boolean clearDisplayWhenHidden = false;
+   private boolean updateScheduled = false;
+
+   private DebugLogService debug() {
+      return ServiceRegistry.getDebugLogService();
+   }
 
    @Subscribe
    public void onSpyCommand(CommandEvent event) {
@@ -122,39 +130,54 @@ public class SpyModule extends BaseCommandHandler {
          return;
       }
 
+      if (!this.checkingSpy && !this.enabled) {
+         return;
+      }
+
+      if (this.checkingSpy) {
+         this.debug().write("spy-chat", "raw=" + message);
+      }
+
       if (!this.checkingSpy) {
          return;
       }
 
-      if (message.startsWith("----------")) {
+      ChatService chat = this.serviceContext.getChatService();
+      StateService state = this.serviceContext.getStateService();
+
+      if (chat.isPlaytimeBlockLine(message)) {
          if (this.processingPlaytimeInfo) {
             this.checkingSpy = false;
             this.shouldUpdate = true;
             this.processingPlaytimeInfo = false;
+            this.debug().write("spy", "playtime block end");
+         } else {
+            this.processingPlaytimeInfo = true;
+            this.debug().write("spy", "playtime block start");
          }
-         this.processingPlaytimeInfo = true;
       }
 
-      StateService state = this.serviceContext.getStateService();
       if (message.startsWith("Игрок") && !message.startsWith("Игрок " + state.getModerNickname())) {
-         event.setCancelled(true);
          if (message.equals("Игрок оффлайн")) {
             state.setSpyPlayerStatus("offline");
+            state.setSpyPlayerActivity("");
          } else if (message.contains("сервере ")) {
             String server = message.split("сервере ", 2)[1];
             if (server.startsWith("lobby")) {
                state.setSpyPlayerStatus("lobby");
             } else {
-               state.setSpyPlayerStatus(this.serviceContext.getChatService().normalizeServerLocation(server));
+               state.setSpyPlayerStatus(chat.normalizeServerLocation(server));
             }
+            state.setSpyPlayerActivity("");
          }
-         state.setSpyPlayerActivity("");
          this.checkingSpy = false;
          this.shouldUpdate = true;
+         this.processingPlaytimeInfo = false;
+         this.debug().write("spy", "find status=" + state.getSpyPlayerStatus());
       }
 
       if (message.startsWith("Текущая")) {
-         String location = this.serviceContext.getChatService().parsePlaytimeLocation(message);
+         String location = chat.parsePlaytimeLocation(message);
          if (location != null) {
             if (location.equalsIgnoreCase("Оффлайн")) {
                state.setSpyPlayerStatus("offline");
@@ -165,33 +188,22 @@ public class SpyModule extends BaseCommandHandler {
                state.setSpyPlayerActivity("");
                this.instantUpdate = true;
             } else {
-               String normalized = this.serviceContext.getChatService().normalizeServerLocation(location);
-               if (this.lastKnownLocation.isEmpty()) {
-                  this.lastKnownLocation = normalized;
-               }
-               if (!normalized.equals(this.lastKnownLocation)) {
-                  state.setSpyPlayerStatus("");
-                  this.lastKnownLocation = normalized;
-               } else {
-                  state.setSpyPlayerStatus(normalized);
-               }
+               String normalized = chat.normalizeServerLocation(location);
+               this.lastKnownLocation = normalized;
+               state.setSpyPlayerStatus(normalized);
             }
+            this.debug().write("spy", "location=" + location + " status=" + state.getSpyPlayerStatus());
          }
       }
 
-      if (message.startsWith("Последняя") && !state.getSpyPlayerStatus().isEmpty()) {
+      if (message.startsWith("Последняя активность:")) {
          state.setSpyPlayerActivity(message.split(": ", 2)[1]);
+         this.debug().write("spy", "activity=" + state.getSpyPlayerActivity());
       }
 
-      if (message.startsWith("Активность")
-         || message.startsWith("Общее время")
-         || message.startsWith("Текущая")
-         || message.startsWith("Время")
-         || message.startsWith("Последняя")
-         || message.startsWith("Последний")
-         || message.startsWith("----------")
-         || message.isEmpty()) {
+      if (this.shouldHideSpyLine(message, chat)) {
          event.setCancelled(true);
+         this.debug().write("spy-chat", "hidden=" + message);
       }
 
       if (this.shouldUpdate) {
@@ -204,10 +216,40 @@ public class SpyModule extends BaseCommandHandler {
             ? 500L
             : (long)this.serviceContext.getConfigManager().getState().getSpyDelay();
          TimeUnit unit = this.instantUpdate ? TimeUnit.MILLISECONDS : TimeUnit.SECONDS;
-         this.serviceContext.getSchedulerService().getExecutor().schedule(this::updateSpyTargets, delay, unit);
+         this.scheduleSpyUpdate(delay, unit);
+         this.debug().write("spy", "schedule update delay=" + delay + unit.name().charAt(0));
          this.instantUpdate = false;
          this.shouldUpdate = false;
       }
+   }
+
+   private boolean shouldHideSpyLine(String message, ChatService chat) {
+      if (this.checkingSpy) {
+         return true;
+      }
+
+      if (this.processingPlaytimeInfo) {
+         return true;
+      }
+
+      if (chat.isPlaytimeOutputLine(message)) {
+         return true;
+      }
+
+      return message.startsWith("Игрок") && !message.startsWith("Игрок " + this.serviceContext.getStateService().getModerNickname());
+   }
+
+   private void scheduleSpyUpdate(long delay, TimeUnit unit) {
+      if (this.updateScheduled) {
+         this.debug().write("spy", "skip duplicate schedule");
+         return;
+      }
+
+      this.updateScheduled = true;
+      this.serviceContext.getSchedulerService().getExecutor().schedule(() -> {
+         this.updateScheduled = false;
+         this.updateSpyTargets();
+      }, delay, unit);
    }
 
    @Subscribe
@@ -313,6 +355,7 @@ public class SpyModule extends BaseCommandHandler {
       this.serviceContext.getStateService().setSpyPlayer(player);
       this.enabled = true;
       this.animTarget = 1.0F;
+      this.debug().write("spy", "start player=" + player);
 
       String[] commands = this.getSpyCommands();
       this.display0 = commands[0];
@@ -320,13 +363,14 @@ public class SpyModule extends BaseCommandHandler {
       this.currentWidth = Math.max(1.0F, this.currentWidth);
       this.currentHeight = Math.max(1.0F, this.currentHeight);
 
-      this.serviceContext.getSchedulerService().getExecutor().schedule(this::updateSpyTargets, 250L, TimeUnit.MILLISECONDS);
+      this.scheduleSpyUpdate(250L, TimeUnit.MILLISECONDS);
       this.serviceContext.getNotificationService().showToast(
          NotificationType.SUCCESS, "§a§lУспех", "Слежка начата", 5.0F
       );
    }
 
    private void toggleSpy() {
+      this.debug().write("spy", "stop");
       this.resetSpyState();
       this.serviceContext.getNotificationService().showToast(
          NotificationType.SUCCESS, "§a§lУспех", "Слежка остановлена.", 5.0F
@@ -353,10 +397,20 @@ public class SpyModule extends BaseCommandHandler {
          return;
       }
 
+      if (this.checkingSpy) {
+         this.debug().write("spy", "skip playtime: waiting for response");
+         return;
+      }
+
       this.checkingSpy = true;
+      this.processingPlaytimeInfo = false;
       StateService state = this.serviceContext.getStateService();
       if (!state.getInHub() && state.getGameInitCompleted()) {
+         this.debug().write("spy", "send /playtime " + state.getSpyPlayer());
          this.serviceContext.getChatService().sendChatOrCommand("/playtime " + state.getSpyPlayer());
+      } else {
+         this.checkingSpy = false;
+         this.debug().write("spy", "skip playtime: inHub=" + state.getInHub() + " init=" + state.getGameInitCompleted());
       }
    }
 
