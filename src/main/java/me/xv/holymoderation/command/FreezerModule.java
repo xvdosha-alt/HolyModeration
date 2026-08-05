@@ -127,6 +127,10 @@ public class FreezerModule extends BaseCommandHandler {
          return;
       }
 
+      ServiceRegistry.getDebugLogService().write(
+         "checkout",
+         "unfrz player=" + this.serviceContext.getStateService().getPlayer()
+      );
       this.hideCheckoutHud();
       this.serviceContext.getCheckoutsService().init(this.serviceContext);
    }
@@ -249,6 +253,10 @@ public class FreezerModule extends BaseCommandHandler {
       if (!CHECKOUT_RESULTS.contains(result)) {
          this.showError("Некорректный результат проверки.");
          return;
+      }
+
+      if (this.serviceContext.getCheckoutsService().releaseActiveCheckout(this.serviceContext)) {
+         ServiceRegistry.getDebugLogService().write("checkout", "released on endcheckout result=" + result);
       }
 
       CompletableFuture.runAsync(() -> this.finishEndCheckoutJournal(result, parts));

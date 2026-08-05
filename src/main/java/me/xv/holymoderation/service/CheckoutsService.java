@@ -5,27 +5,15 @@ import java.util.concurrent.TimeUnit;
 import me.xv.holymoderation.core.BaseService;
 import me.xv.holymoderation.core.ServiceContext;
 import me.xv.holymoderation.core.ServiceRegistry;
-import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.util.NotificationType;
 import me.xv.holymoderation.service.ModerLocationResolver;
 import me.xv.holymoderation.service.ModerPlaytimeService;
 
 public class CheckoutsService extends BaseService {
    public void init(ServiceContext context) {
-      if (!context.getStateService().getPlayer().isEmpty()) {
-         String player = context.getStateService().getPlayer();
-         context.getChatService().sendChatOrCommand("/freezing " + player);
-         context.getChatService().sendChatOrCommand("/prova");
-         if (context.getConfigManager().getState().getAutoVanishEnabled()
-            && !context.getStateService().getVanishEnabled()) {
-            context.getChatService().sendChatOrCommand("/v");
-            context.getStateService().setVanishEnabled(true);
-         }
-         if (context.getConfigManager().getState().getAutoGm3Enabled()
-            && !context.getStateService().getGm3Enabled()) {
-            context.getChatService().sendChatOrCommand("/gm 3");
-            context.getStateService().setGm3Enabled(true);
-         }
+      String player = context.getStateService().getPlayer();
+      if (!player.isEmpty()) {
+         this.releaseCheckoutPlayer(context, player);
       }
 
       ServiceRegistry.getNotificationService().showToast(
@@ -34,13 +22,40 @@ public class CheckoutsService extends BaseService {
          "Вы успешно закончили проверку.",
          5.0F
       );
-      String player = new String(context.getStateService().getPlayer().toCharArray());
+      String finalizedPlayer = new String(player.toCharArray());
       context.getSchedulerService().getExecutor().schedule(
-         () -> finalizeCheckout(context, player),
+         () -> finalizeCheckout(context, finalizedPlayer),
          1L,
          TimeUnit.SECONDS
       );
       context.getStateService().setPlayer("");
+   }
+
+   public boolean releaseActiveCheckout(ServiceContext context) {
+      String player = context.getStateService().getPlayer();
+      if (player.isEmpty()) {
+         return false;
+      }
+
+      this.releaseCheckoutPlayer(context, player);
+      context.getStateService().setPlayer("");
+      return true;
+   }
+
+   private void releaseCheckoutPlayer(ServiceContext context, String player) {
+      ServiceRegistry.getDebugLogService().write("checkout", "release player=" + player + " cmd=/freezing");
+      context.getChatService().sendChatOrCommand("/freezing " + player);
+      context.getChatService().sendChatOrCommand("/prova");
+      if (context.getConfigManager().getState().getAutoVanishEnabled()
+         && !context.getStateService().getVanishEnabled()) {
+         context.getChatService().sendChatOrCommand("/v");
+         context.getStateService().setVanishEnabled(true);
+      }
+      if (context.getConfigManager().getState().getAutoGm3Enabled()
+         && !context.getStateService().getGm3Enabled()) {
+         context.getChatService().sendChatOrCommand("/gm 3");
+         context.getStateService().setGm3Enabled(true);
+      }
    }
 
    public boolean startCheckout(String player, ServiceContext context) {
@@ -237,15 +252,8 @@ public class CheckoutsService extends BaseService {
 
    private static void sendClickableMessages(ServiceContext context, String[][] entries) {
       ChatService chat = context.getChatService();
-      for (int index = 0; index < entries.length; index++) {
-         String display = entries[index][0];
-         String hover = entries[index][1];
-         String command = entries[index][2];
-         context.getSchedulerService().getExecutor().schedule(
-            () -> chat.sendMessage(chat.textWithPrefix(display, hover, command)),
-            (long)index * 150L,
-            TimeUnit.MILLISECONDS
-         );
+      for (String[] entry : entries) {
+         chat.sendMessage(chat.textWithPrefix(entry[0], entry[1], entry[2]));
       }
    }
 
