@@ -109,7 +109,9 @@ public class SettingsManager extends BaseCommandHandler {
             break;
          case "autodupeip":
             state.setDupeIpEnabled(!state.getDupeIpEnabled());
-            this.showSuccess("Автоматический /dupeip " + (state.getDupeIpEnabled() ? "включён" : "выключен") + ".");
+            this.showSuccess(
+               "Сканер /dupeip " + (state.getDupeIpEnabled() ? "включён" : "выключен") + "."
+            );
             break;
          case "autocopy":
             state.setAutoAnyDeskEnabled(!state.getAutoAnyDeskEnabled());

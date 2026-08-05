@@ -127,6 +127,9 @@ public class CheckoutsService extends BaseService {
          context.getChatService().sendChatOrCommand("/warp logo");
       }
       context.getChatService().sendChatOrCommand("/prova");
+      if (context.getConfigManager().getState().getDupeIpEnabled()) {
+         ServiceRegistry.getDupeIpScannerService().startScan(player);
+      }
       this.scheduleCheckoutStart(context);
       return true;
    }
@@ -237,9 +240,6 @@ public class CheckoutsService extends BaseService {
          return;
       }
 
-      if (context.getConfigManager().getState().getDupeIpEnabled()) {
-         context.getChatService().sendChatOrCommand("/dupeip " + context.getStateService().getPlayer());
-      }
       context.getChatService().sendChatOrCommand("/checkmute " + context.getStateService().getPlayer());
       if (context.getConfigManager().getState().getAutoVanishEnabled()
          && context.getStateService().getVanishEnabled()) {

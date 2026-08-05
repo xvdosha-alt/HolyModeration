@@ -6,6 +6,7 @@ import me.xv.holymoderation.event.EventBus;
 import me.xv.holymoderation.service.ChatService;
 import me.xv.holymoderation.service.CheckoutsService;
 import me.xv.holymoderation.service.DebugLogService;
+import me.xv.holymoderation.service.DupeIpScannerService;
 import me.xv.holymoderation.service.KeyBindingService;
 import me.xv.holymoderation.service.LoggerService;
 import me.xv.holymoderation.service.MinecraftService;
@@ -23,6 +24,7 @@ public class ServiceRegistry {
    private static EventBus eventBus;
    private static ChatService chatService;
    private static CheckoutsService checkoutsService;
+   private static DupeIpScannerService dupeIpScannerService;
    private static DebugLogService debugLogService;
    private static KeyBindingService keyBindingService;
    private static MinecraftService minecraftService;
@@ -40,6 +42,7 @@ public class ServiceRegistry {
       EventBus eventBus,
       ChatService chatService,
       CheckoutsService checkoutsService,
+      DupeIpScannerService dupeIpScannerService,
       DebugLogService debugLogService,
       KeyBindingService keyBindingService,
       MinecraftService minecraftService,
@@ -56,6 +59,7 @@ public class ServiceRegistry {
       ServiceRegistry.eventBus = eventBus;
       ServiceRegistry.chatService = chatService;
       ServiceRegistry.checkoutsService = checkoutsService;
+      ServiceRegistry.dupeIpScannerService = dupeIpScannerService;
       ServiceRegistry.debugLogService = debugLogService;
       ServiceRegistry.keyBindingService = keyBindingService;
       ServiceRegistry.minecraftService = minecraftService;
@@ -75,6 +79,7 @@ public class ServiceRegistry {
       eventBus.setLogger(loggerService);
       chatService.init(loggerService);
       checkoutsService.init(loggerService);
+      dupeIpScannerService.init(loggerService);
       debugLogService.init(loggerService);
       keyBindingService.init(loggerService);
       minecraftService.init(loggerService);
@@ -106,6 +111,11 @@ public class ServiceRegistry {
    @Generated
    public static CheckoutsService getCheckoutsService() {
       return checkoutsService;
+   }
+
+   @Generated
+   public static DupeIpScannerService getDupeIpScannerService() {
+      return dupeIpScannerService;
    }
 
    @Generated

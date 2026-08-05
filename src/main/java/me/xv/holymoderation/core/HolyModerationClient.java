@@ -1,6 +1,7 @@
 package me.xv.holymoderation.core;
 
 import me.xv.holymoderation.gui.HudPanelDragSetup;
+import me.xv.holymoderation.command.DupeIpModule;
 import me.xv.holymoderation.command.ModCommands;
 import me.xv.holymoderation.command.CoreModule;
 import me.xv.holymoderation.command.FreezerModule;
@@ -17,6 +18,7 @@ import me.xv.holymoderation.config.ConfigManager;
 import me.xv.holymoderation.event.EventBus;
 import me.xv.holymoderation.service.ChatService;
 import me.xv.holymoderation.service.CheckoutsService;
+import me.xv.holymoderation.service.DupeIpScannerService;
 import me.xv.holymoderation.service.DebugLogService;
 import me.xv.holymoderation.service.KeyBindingService;
 import me.xv.holymoderation.service.MinecraftService;
@@ -38,6 +40,7 @@ public class HolyModerationClient implements ClientModInitializer {
          new EventBus(),
          new ChatService(),
          new CheckoutsService(),
+         new DupeIpScannerService(),
          new DebugLogService(),
          new KeyBindingService(),
          new MinecraftService(),
@@ -75,5 +78,6 @@ public class HolyModerationClient implements ClientModInitializer {
       eventBus.register(new CoreModule());
       eventBus.register(new SpyModule());
       eventBus.register(new TwinksCheckModule());
+      eventBus.register(new DupeIpModule());
    }
 }

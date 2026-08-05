@@ -34,6 +34,12 @@ public class ModState {
    @Expose
    private Float checkoutHudTopY;
    @Expose
+   private int dupeIpBanWindowX = -1;
+   @Expose
+   private int dupeIpBanWindowY = -1;
+   @Expose
+   private boolean dupeIpDraggableBanWindow = true;
+   @Expose
    private final List<String> textsList = new ArrayList<>();
    @Expose
    private boolean autoVanishEnabled = true;
@@ -138,6 +144,21 @@ public class ModState {
    @Generated
    public Float getCheckoutHudTopY() {
       return this.checkoutHudTopY;
+   }
+
+   @Generated
+   public int getDupeIpBanWindowX() {
+      return this.dupeIpBanWindowX;
+   }
+
+   @Generated
+   public int getDupeIpBanWindowY() {
+      return this.dupeIpBanWindowY;
+   }
+
+   @Generated
+   public boolean getDupeIpDraggableBanWindow() {
+      return this.dupeIpDraggableBanWindow;
    }
 
    @Generated
@@ -248,6 +269,21 @@ public class ModState {
    @Generated
    public void setCheckoutHudTopY(Float value) {
       this.checkoutHudTopY = value;
+   }
+
+   @Generated
+   public void setDupeIpBanWindowX(int value) {
+      this.dupeIpBanWindowX = value;
+   }
+
+   @Generated
+   public void setDupeIpBanWindowY(int value) {
+      this.dupeIpBanWindowY = value;
+   }
+
+   @Generated
+   public void setDupeIpDraggableBanWindow(boolean enabled) {
+      this.dupeIpDraggableBanWindow = enabled;
    }
 
    @Generated
