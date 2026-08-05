@@ -2,9 +2,6 @@ package me.xv.holymoderation.util;
 
 import java.util.regex.Pattern;
 import me.xv.holymoderation.core.ServiceRegistry;
-import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 
 public final class CheckoutMarkerService {
    private CheckoutMarkerService() {
@@ -27,24 +24,6 @@ public final class CheckoutMarkerService {
       return !checkoutPlayer.isEmpty() && checkoutPlayer.equalsIgnoreCase(name.trim());
    }
 
-   public static boolean matchesPlayerInfo(PlayerInfo info) {
-      if (info == null || !hasCheckoutPlayer()) {
-         return false;
-      }
-
-      String checkoutPlayer = getCheckoutPlayer();
-      if (isCheckoutPlayer(info.getProfile().name())) {
-         return true;
-      }
-
-      Component tabName = info.getTabListDisplayName();
-      if (tabName != null && containsPlayerName(stripFormatting(tabName.getString()), checkoutPlayer)) {
-         return true;
-      }
-
-      return false;
-   }
-
    public static boolean matchesChatSender(String senderName, String strippedMessage) {
       if (!hasCheckoutPlayer()) {
          return false;
@@ -65,18 +44,6 @@ public final class CheckoutMarkerService {
       }
 
       return containsPlayerName(strippedMessage.substring(0, colonIndex), checkoutPlayer);
-   }
-
-   public static Component prefixComponent(Component original) {
-      if (original == null) {
-         return Component.empty();
-      }
-
-      String marker = ServiceRegistry.getConfigManager().getState().getPlayerMarker();
-      MutableComponent prefixed = Component.empty()
-         .append(ServiceRegistry.getChatService().legacyComponent(marker + " "))
-         .append(original);
-      return prefixed;
    }
 
    public static boolean containsPlayerName(String text, String player) {

@@ -10,9 +10,7 @@
     "KeyboardMixin",
     "MessageHandlerMixin",
     "MinecraftClientMixin",
-    "AvatarRendererMixin",
-    "PlayerTabOverlayAccessor",
-    "PlayerTabOverlayMixin"
+    "PlayerTabOverlayAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
