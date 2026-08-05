@@ -117,6 +117,7 @@ public class FreezerModule extends BaseCommandHandler {
          return;
       }
 
+      this.hideCheckoutHud();
       this.serviceContext.getCheckoutsService().init(this.serviceContext);
    }
 

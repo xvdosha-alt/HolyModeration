@@ -10,7 +10,8 @@ import me.xv.holymoderation.util.NotificationType;
 public class CheckoutsService extends BaseService {
    public void init(ServiceContext context) {
       if (!context.getStateService().getPlayer().isEmpty()) {
-         context.getChatService().sendChatOrCommand("/freezing " + context.getStateService().getPlayer());
+         String player = context.getStateService().getPlayer();
+         context.getChatService().sendChatOrCommand("/unfreezing " + player);
          context.getChatService().sendChatOrCommand("/prova");
          if (context.getConfigManager().getState().getAutoVanishEnabled()
             && !context.getStateService().getVanishEnabled()) {
