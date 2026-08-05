@@ -41,6 +41,11 @@ public class SpyModule extends BaseCommandHandler {
 
       StateService state = this.serviceContext.getStateService();
       if (parts[1].equals("spy")) {
+         if (parts.length == 3 && this.isSpyFreezeArg(parts[2])) {
+            this.handleSpyFreeze(state);
+            return;
+         }
+
          if (parts.length == 2) {
             if (!state.getSpyPlayer().isEmpty()) {
                this.toggleSpy();
@@ -82,6 +87,31 @@ public class SpyModule extends BaseCommandHandler {
          if (this.serviceContext.getCheckoutsService().startCheckout(state.getSpyPlayer(), this.serviceContext)) {
             this.toggleSpy();
          }
+      }
+   }
+
+   private boolean isSpyFreezeArg(String arg) {
+      return arg.equalsIgnoreCase("frz")
+         || arg.equalsIgnoreCase("freeze")
+         || arg.equalsIgnoreCase("freezing")
+         || arg.equalsIgnoreCase("фриз");
+   }
+
+   private void handleSpyFreeze(StateService state) {
+      if (state.getInHub()) {
+         this.showWarning("В хабе этого делать нельзя.");
+         return;
+      }
+
+      if (state.getSpyPlayer().isEmpty()) {
+         this.serviceContext.getNotificationService().showToast(
+            NotificationType.ERROR, "§c§lОшибка", "Вы ни за кем не следите.", 5.0F
+         );
+         return;
+      }
+
+      if (this.serviceContext.getCheckoutsService().startCheckout(state.getSpyPlayer(), this.serviceContext)) {
+         this.toggleSpy();
       }
    }
 

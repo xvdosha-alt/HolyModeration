@@ -61,7 +61,11 @@ public final class ModCommands {
       }
 
       for (String command : chatService.PlayerCommands) {
-         registerPlayerCommand(hm, command);
+         if (command.equals("spy")) {
+            registerSpyCommand(hm);
+         } else {
+            registerPlayerCommand(hm, command);
+         }
       }
 
       for (String command : chatService.OneArgCommands) {
@@ -150,6 +154,19 @@ public final class ModCommands {
       dispatcher.register(hm);
       registerRootPlayerCommand(dispatcher, "frz");
       registerRootPlayerCommand(dispatcher, "freezing");
+   }
+
+   private static void registerSpyCommand(LiteralArgumentBuilder<FabricClientCommandSource> hm) {
+      LiteralArgumentBuilder<FabricClientCommandSource> spy = ClientCommandManager.literal("spy");
+      for (String freezeArg : new String[]{"frz", "freeze", "freezing"}) {
+         spy.then(ClientCommandManager.literal(freezeArg).executes(ctx -> dispatch("hm spy " + freezeArg)));
+      }
+      spy.then(
+         ClientCommandManager.argument("player", StringArgumentType.word())
+            .suggests(ONLINE_PLAYERS)
+            .executes(ctx -> dispatch("hm spy " + StringArgumentType.getString(ctx, "player")))
+      );
+      hm.then(spy);
    }
 
    private static void registerRootPlayerCommand(

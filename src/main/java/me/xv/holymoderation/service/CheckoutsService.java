@@ -11,7 +11,7 @@ public class CheckoutsService extends BaseService {
    public void init(ServiceContext context) {
       if (!context.getStateService().getPlayer().isEmpty()) {
          String player = context.getStateService().getPlayer();
-         context.getChatService().sendChatOrCommand("/unfreezing " + player);
+         context.getChatService().sendChatOrCommand("/freezing " + player);
          context.getChatService().sendChatOrCommand("/prova");
          if (context.getConfigManager().getState().getAutoVanishEnabled()
             && !context.getStateService().getVanishEnabled()) {
