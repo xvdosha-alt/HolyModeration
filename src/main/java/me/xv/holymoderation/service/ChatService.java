@@ -139,6 +139,21 @@ public class ChatService extends BaseService {
       if (text.matches("(?i)classic-anarchy-(\\d+)")) {
          return "classic-" + text.replaceAll("(?i)classic-anarchy-", "");
       }
+      if (text.matches("(?i)prime-anarchy-(\\d+)")) {
+         return "prime-" + text.replaceAll("(?i)prime-anarchy-", "");
+      }
+      if (text.matches("(?i)l2anarchy\\d+")) {
+         return "lite120-" + text.replaceAll("(?i)l2anarchy", "");
+      }
+      if (text.matches("(?i)lanarchy\\d+")) {
+         return "lite-" + text.replaceAll("(?i)lanarchy", "");
+      }
+      if (text.matches("(?i)pranarchy\\d+")) {
+         return "prime-" + text.replaceAll("(?i)pranarchy", "");
+      }
+      if (text.matches("(?i)anarchy\\d+")) {
+         return "classic-" + text.replaceAll("(?i)anarchy", "");
+      }
       if (text.equals("l2anarchy")) {
          return "lite120-1";
       }
@@ -151,14 +166,29 @@ public class ChatService extends BaseService {
       if (text.equals("lpvp")) {
          return "lpvp";
       }
-      if (text.startsWith("l2") && text.contains("anarchy")) {
-         return "lite120-" + text.split("anarchy")[1];
+      if (text.equals("pranarchy")) {
+         return "prime-1";
       }
-      if (text.startsWith("l") && text.contains("anarchy")) {
-         return "lite-" + text.split("anarchy")[1];
+      if (text.startsWith("l2") && text.contains("anarchy")) {
+         return "lite120-" + text.split("anarchy")[1].replaceAll("\\D.*", "");
+      }
+      if (text.matches("(?i).*lite-anarchy-\\d+.*")) {
+         return "lite-" + text.replaceAll("(?i).*lite-anarchy-(\\d+).*", "$1");
+      }
+      if (text.matches("(?i).*lite120-anarchy-\\d+.*")) {
+         return "lite120-" + text.replaceAll("(?i).*lite120-anarchy-(\\d+).*", "$1");
+      }
+      if (text.matches("(?i).*prime-anarchy-\\d+.*")) {
+         return "prime-" + text.replaceAll("(?i).*prime-anarchy-(\\d+).*", "$1");
+      }
+      if (text.matches("(?i).*classic-anarchy-\\d+.*")) {
+         return "classic-" + text.replaceAll("(?i).*classic-anarchy-(\\d+).*", "$1");
+      }
+      if (text.startsWith("l") && text.contains("anarchy") && !text.toLowerCase().startsWith("prime")) {
+         return "lite-" + text.split("anarchy")[1].replaceAll("\\D.*", "");
       }
       if (text.contains("anarchy")) {
-         return "classic-" + text.split("anarchy")[1];
+         return "classic-" + text.split("anarchy")[1].replaceAll("\\D.*", "");
       }
       return text.toLowerCase();
    }

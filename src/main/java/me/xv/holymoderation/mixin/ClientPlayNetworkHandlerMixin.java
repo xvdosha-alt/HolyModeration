@@ -4,10 +4,12 @@ import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.event.ChatSendEvent;
 import me.xv.holymoderation.event.CommandEvent;
 import me.xv.holymoderation.event.ServerConnectEvent;
+import me.xv.holymoderation.service.TabLocationService;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.network.protocol.game.ClientboundTabListPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -24,6 +26,11 @@ public class ClientPlayNetworkHandlerMixin {
             ServiceRegistry.getEventBus().post(new ServerConnectEvent(serverInfo, ServiceRegistry.getStateService().getConnected()));
          }
       }
+   }
+
+   @Inject(method = "handleTabListCustomisation", at = @At("TAIL"))
+   private void onTabListCustomisation(ClientboundTabListPacket packet, CallbackInfo ci) {
+      TabLocationService.updateModerLocation();
    }
 
    @Inject(method = "sendChat", at = @At("HEAD"), cancellable = true)

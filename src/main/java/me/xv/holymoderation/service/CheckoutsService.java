@@ -5,7 +5,10 @@ import java.util.concurrent.TimeUnit;
 import me.xv.holymoderation.core.BaseService;
 import me.xv.holymoderation.core.ServiceContext;
 import me.xv.holymoderation.core.ServiceRegistry;
+import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.util.NotificationType;
+import me.xv.holymoderation.service.ModerLocationResolver;
+import me.xv.holymoderation.service.ModerPlaytimeService;
 
 public class CheckoutsService extends BaseService {
    public void init(ServiceContext context) {
@@ -58,6 +61,18 @@ public class CheckoutsService extends BaseService {
          5.0F
       );
       context.getStateService().setPlayer(player);
+      ModerPlaytimeService.requestModerLocation(context, true);
+      String location = ModerLocationResolver.resolve(context, player);
+      if (!location.isBlank()) {
+         context.getStateService().setModerLocation(location);
+      }
+      ServiceRegistry.getDebugLogService().write(
+         "journal",
+         "checkout started player=" + player
+            + " moderLocation=" + context.getStateService().getModerLocation()
+            + " lastAnarchy=" + context.getStateService().getLastAnarchyLocation()
+            + " inHub=" + context.getStateService().getInHub()
+      );
       context.getChatService().sendChatOrCommand("/freezing " + context.getStateService().getPlayer());
       if (context.getConfigManager().getState().getAutoTpEnabled()) {
          context.getChatService().sendChatOrCommand("/warp logo");

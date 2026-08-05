@@ -1,6 +1,5 @@
 package me.xv.holymoderation.command;
 
-import java.awt.Color;
 import java.util.concurrent.TimeUnit;
 import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.event.ChatMessageEvent;
@@ -9,14 +8,18 @@ import me.xv.holymoderation.event.CommandEvent;
 import me.xv.holymoderation.event.RenderHudEvent;
 import me.xv.holymoderation.event.ServerConnectEvent;
 import me.xv.holymoderation.event.Subscribe;
+import me.xv.holymoderation.gui.HudPanelRenderer;
+import me.xv.holymoderation.gui.HudPanelStyle;
 import me.xv.holymoderation.service.ChatService;
 import me.xv.holymoderation.service.DebugLogService;
 import me.xv.holymoderation.service.Render2DService;
 import me.xv.holymoderation.service.StateService;
+import me.xv.holymoderation.service.TabLocationService;
 import me.xv.holymoderation.util.NotificationType;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.world.level.GameType;
 import org.jetbrains.annotations.NotNull;
 
 public class SpyModule extends BaseCommandHandler {
@@ -24,7 +27,6 @@ public class SpyModule extends BaseCommandHandler {
    private boolean checkingSpy = false;
    private boolean processingPlaytimeInfo = false;
    private boolean shouldUpdate = false;
-   private boolean instantUpdate = false;
    private String lastKnownLocation = "";
    private float anim = 0.0F;
    private float animTarget = 0.0F;
@@ -134,16 +136,12 @@ public class SpyModule extends BaseCommandHandler {
          return;
       }
 
-      if (this.checkingSpy) {
-         this.debug().write("spy-chat", "raw=" + message);
-      }
+      ChatService chat = this.serviceContext.getChatService();
+      StateService state = this.serviceContext.getStateService();
 
       if (!this.checkingSpy) {
          return;
       }
-
-      ChatService chat = this.serviceContext.getChatService();
-      StateService state = this.serviceContext.getStateService();
 
       if (chat.isPlaytimeBlockLine(message)) {
          if (this.processingPlaytimeInfo) {
@@ -157,23 +155,8 @@ public class SpyModule extends BaseCommandHandler {
          }
       }
 
-      if (message.startsWith("Игрок") && !message.startsWith("Игрок " + state.getModerNickname())) {
-         if (message.equals("Игрок оффлайн")) {
-            state.setSpyPlayerStatus("offline");
-            state.setSpyPlayerActivity("");
-         } else if (message.contains("сервере ")) {
-            String server = message.split("сервере ", 2)[1];
-            if (server.startsWith("lobby")) {
-               state.setSpyPlayerStatus("lobby");
-            } else {
-               state.setSpyPlayerStatus(chat.normalizeServerLocation(server));
-            }
-            state.setSpyPlayerActivity("");
-         }
-         this.checkingSpy = false;
-         this.shouldUpdate = true;
-         this.processingPlaytimeInfo = false;
-         this.debug().write("spy", "find status=" + state.getSpyPlayerStatus());
+      if (message.startsWith("Лобби ▶") || message.startsWith("Вы были кикнуты")) {
+         this.pauseSpyInHub(state);
       }
 
       if (message.startsWith("Текущая")) {
@@ -182,11 +165,9 @@ public class SpyModule extends BaseCommandHandler {
             if (location.equalsIgnoreCase("Оффлайн")) {
                state.setSpyPlayerStatus("offline");
                state.setSpyPlayerActivity("");
-               this.instantUpdate = true;
-            } else if (location.toLowerCase().startsWith("lobby")) {
+            } else             if (location.toLowerCase().startsWith("lobby")) {
                state.setSpyPlayerStatus("lobby");
                state.setSpyPlayerActivity("");
-               this.instantUpdate = true;
             } else {
                String normalized = chat.normalizeServerLocation(location);
                this.lastKnownLocation = normalized;
@@ -201,45 +182,72 @@ public class SpyModule extends BaseCommandHandler {
          this.debug().write("spy", "activity=" + state.getSpyPlayerActivity());
       }
 
-      if (this.shouldHideSpyLine(message, chat)) {
+      if (this.shouldHideSpyLine(message, chat, state)) {
          event.setCancelled(true);
          this.debug().write("spy-chat", "hidden=" + message);
       }
 
       if (this.shouldUpdate) {
-         if (this.instantUpdate
-            || (state.getModerLocation().equals(state.getSpyPlayerStatus()) && state.getSpyPlayerActivity().isEmpty())) {
-            this.instantUpdate = true;
-         }
-
-         long delay = this.instantUpdate
-            ? 500L
-            : (long)this.serviceContext.getConfigManager().getState().getSpyDelay();
-         TimeUnit unit = this.instantUpdate ? TimeUnit.MILLISECONDS : TimeUnit.SECONDS;
-         this.scheduleSpyUpdate(delay, unit);
-         this.debug().write("spy", "schedule update delay=" + delay + unit.name().charAt(0));
-         this.instantUpdate = false;
          this.shouldUpdate = false;
+         this.scheduleNextSpyPoll(state);
       }
    }
 
-   private boolean shouldHideSpyLine(String message, ChatService chat) {
-      if (this.checkingSpy) {
-         return true;
+   private boolean isSpyRelatedLine(String message, ChatService chat, StateService state) {
+      return chat.isPlaytimeOutputLine(message) || chat.isPlaytimeBlockLine(message);
+   }
+
+   private boolean shouldHideSpyLine(String message, ChatService chat, StateService state) {
+      if (!this.isSpyRelatedLine(message, chat, state)) {
+         return false;
       }
 
-      if (this.processingPlaytimeInfo) {
-         return true;
+      return this.checkingSpy || this.processingPlaytimeInfo;
+   }
+
+   private void pauseSpyInHub(StateService state) {
+      if (!this.enabled) {
+         return;
       }
 
-      if (chat.isPlaytimeOutputLine(message)) {
-         return true;
+      state.setInHub(true);
+      this.checkingSpy = false;
+      this.processingPlaytimeInfo = false;
+      this.shouldUpdate = false;
+      if (!"stop".equals(state.getSpyPlayerStatus())) {
+         state.setSpyPlayerActivity("");
+         state.setSpyPlayerStatus("stop");
+      }
+      this.debug().write("spy", "pause: hub/lobby detected");
+   }
+
+   private void scheduleNextSpyPoll(StateService state) {
+      if (!this.enabled || this.isModerInHub(state) || "stop".equals(state.getSpyPlayerStatus())) {
+         this.debug().write("spy", "skip schedule: enabled=" + this.enabled + " hub=" + this.isModerInHub(state));
+         return;
       }
 
-      return message.startsWith("Игрок") && !message.startsWith("Игрок " + this.serviceContext.getStateService().getModerNickname());
+      long delaySeconds = Math.max(1L, (long)this.serviceContext.getConfigManager().getState().getSpyDelay());
+      String status = state.getSpyPlayerStatus();
+      if ("offline".equals(status) || "lobby".equals(status)) {
+         delaySeconds = Math.max(delaySeconds, 5L);
+      }
+
+      this.scheduleSpyUpdate(delaySeconds, TimeUnit.SECONDS);
+      this.debug().write("spy", "schedule update delay=" + delaySeconds + "S");
    }
 
    private void scheduleSpyUpdate(long delay, TimeUnit unit) {
+      if (!this.enabled) {
+         return;
+      }
+
+      StateService state = this.serviceContext.getStateService();
+      if (this.isModerInHub(state) || "stop".equals(state.getSpyPlayerStatus())) {
+         this.debug().write("spy", "skip schedule: paused");
+         return;
+      }
+
       if (this.updateScheduled) {
          this.debug().write("spy", "skip duplicate schedule");
          return;
@@ -252,7 +260,7 @@ public class SpyModule extends BaseCommandHandler {
       }, delay, unit);
    }
 
-   @Subscribe
+   @Subscribe(priority = 102)
    public void onSpyServerConnect(ServerConnectEvent event) {
       if (event.isSwitch()) {
          this.initSpy();
@@ -273,47 +281,73 @@ public class SpyModule extends BaseCommandHandler {
          return;
       }
 
-      String[] commands = this.getSpyCommands();
-      if (!commands[0].isEmpty() || !commands[1].isEmpty()) {
-         this.display0 = commands[0];
-         this.display1 = commands[1];
+      HudPanelRenderer.Content content = this.buildSpyHudContent();
+      if (!content.primary().isEmpty()) {
+         this.display0 = content.primary();
+         this.display1 = content.secondary() == null ? "" : content.secondary();
       }
 
       GuiGraphics graphics = event.getGuiGraphics();
       Font font = this.serviceContext.getMinecraftService().getClient().font;
+      Render2DService render = this.serviceContext.getRender2DService();
 
-      int width0 = font.width(this.display0);
-      int width1 = font.width(this.display1);
-      float boxWidth = Math.max(width0, width1) + 16.0F;
-      int lines = this.display1.isEmpty() ? 1 : 2;
-      int contentHeight = lines * 9 + (lines == 2 ? 4 : 0);
-      float boxHeight = contentHeight + 12.0F;
-
+      float boxWidth = HudPanelRenderer.measureWidth(font, content);
+      float boxHeight = HudPanelRenderer.measureHeight(font, content);
       this.currentWidth += (boxWidth - this.currentWidth) * 0.2F;
       this.currentHeight += (boxHeight - this.currentHeight) * 0.2F;
 
       float renderWidth = Math.max(1.0F, this.currentWidth * this.anim);
       float renderHeight = Math.max(1.0F, this.currentHeight * this.anim);
       float centerX = graphics.guiWidth() / 2.0F;
-      float x = centerX - renderWidth / 2.0F;
-      float y = 30.0F;
+      float y = 28.0F;
 
-      Color background = new Color(10, 20, 40, 220);
-      Color outline = new Color(60, 120, 220);
-      Render2DService render = this.serviceContext.getRender2DService();
-      render.drawSoftRoundedRectOutline(graphics, x, y, renderWidth, renderHeight, 10.0F, background, outline, 1.5F, 3.0F);
-
-      float textY = y + 6.0F;
-      render.drawText(font, this.display0, centerX - font.width(this.display0) / 2.0F, textY, -1, false, graphics);
-      if (!this.display1.isEmpty()) {
-         render.drawText(font, this.display1, centerX - font.width(this.display1) / 2.0F, textY + 13.0F, -1, false, graphics);
-      }
+      HudPanelRenderer.drawCentered(
+         render,
+         graphics,
+         font,
+         centerX,
+         y,
+         renderWidth,
+         renderHeight,
+         HudPanelStyle.spy(),
+         content
+      );
 
       if (this.anim < 0.02F && this.animTarget == 0.0F && this.clearDisplayWhenHidden) {
          this.display0 = "";
          this.display1 = "";
          this.clearDisplayWhenHidden = false;
       }
+   }
+
+   private HudPanelRenderer.Content buildSpyHudContent() {
+      StateService state = this.serviceContext.getStateService();
+      String spyPlayer = state.getSpyPlayer();
+      if (spyPlayer.isEmpty() && this.display0.isEmpty()) {
+         return new HudPanelRenderer.Content("SPY", "", "");
+      }
+
+      if (spyPlayer.isEmpty()) {
+         return new HudPanelRenderer.Content("SPY", this.display0, this.display1);
+      }
+
+      String status = state.getSpyPlayerStatus();
+      if (status.isEmpty()) {
+         return new HudPanelRenderer.Content("SPY", "§f" + spyPlayer, "§7Получение данных...");
+      }
+
+      return switch (status) {
+         case "stop" -> new HudPanelRenderer.Content("SPY", "§f" + spyPlayer, "§6Слежка приостановлена");
+         case "offline" -> new HudPanelRenderer.Content("SPY", "§f" + spyPlayer, "§cОффлайн");
+         case "lobby" -> new HudPanelRenderer.Content("SPY", "§f" + spyPlayer, "§eВ лобби");
+         default -> {
+            String activity = state.getSpyPlayerActivity();
+            if (activity == null || activity.isEmpty()) {
+               yield new HudPanelRenderer.Content("SPY", "§f" + spyPlayer + " §8→ §b" + status, "§7Активность неизвестна");
+            }
+            yield new HudPanelRenderer.Content("SPY", "§f" + spyPlayer + " §8→ §b" + status, "§7Активность: §f" + activity);
+         }
+      };
    }
 
    @NotNull
@@ -382,6 +416,10 @@ public class SpyModule extends BaseCommandHandler {
       state.setSpyPlayer("");
       this.enabled = false;
       this.animTarget = 0.0F;
+      this.checkingSpy = false;
+      this.processingPlaytimeInfo = false;
+      this.shouldUpdate = false;
+      this.updateScheduled = false;
 
       String[] commands = this.getSpyCommands();
       this.display0 = commands[0];
@@ -397,21 +435,27 @@ public class SpyModule extends BaseCommandHandler {
          return;
       }
 
+      StateService state = this.serviceContext.getStateService();
+      if (this.isModerInHub(state) || "stop".equals(state.getSpyPlayerStatus())) {
+         this.checkingSpy = false;
+         this.debug().write("spy", "skip playtime: paused hub=" + state.getInHub() + " status=" + state.getSpyPlayerStatus());
+         return;
+      }
+
       if (this.checkingSpy) {
          this.debug().write("spy", "skip playtime: waiting for response");
          return;
       }
 
+      if (!state.getGameInitCompleted()) {
+         this.debug().write("spy", "skip playtime: init=false");
+         return;
+      }
+
       this.checkingSpy = true;
       this.processingPlaytimeInfo = false;
-      StateService state = this.serviceContext.getStateService();
-      if (!state.getInHub() && state.getGameInitCompleted()) {
-         this.debug().write("spy", "send /playtime " + state.getSpyPlayer());
-         this.serviceContext.getChatService().sendChatOrCommand("/playtime " + state.getSpyPlayer());
-      } else {
-         this.checkingSpy = false;
-         this.debug().write("spy", "skip playtime: inHub=" + state.getInHub() + " init=" + state.getGameInitCompleted());
-      }
+      this.debug().write("spy", "send /playtime " + state.getSpyPlayer());
+      this.serviceContext.getChatService().sendChatOrCommand("/playtime " + state.getSpyPlayer());
    }
 
    private void clearSpyData() {
@@ -425,23 +469,39 @@ public class SpyModule extends BaseCommandHandler {
          return;
       }
 
-      if (state.getInHub()) {
-         this.lastKnownLocation = "";
-         state.setSpyPlayerActivity("");
-         state.setSpyPlayerStatus("stop");
-         this.serviceContext.getNotificationService().showToast(
-            NotificationType.SUCCESS, "§a§lУспех", "Слежка приостановлена.", 5.0F
-         );
-      } else {
-         if (!state.getModerLocation().isEmpty()) {
-            this.updateSpyTargets();
+      if (this.isModerInHub(state)) {
+         if (!"stop".equals(state.getSpyPlayerStatus())) {
+            this.lastKnownLocation = "";
+            state.setSpyPlayerActivity("");
+            state.setSpyPlayerStatus("stop");
+            this.serviceContext.getNotificationService().showToast(
+               NotificationType.SUCCESS, "§a§lУспех", "Слежка приостановлена.", 5.0F
+            );
          }
-         this.serviceContext.getNotificationService().showToast(
-            NotificationType.SUCCESS, "§a§lУспех", "Слежка возобновлена.", 5.0F
-         );
+         return;
       }
 
-      this.initSpy();
+      TabLocationService.updateModerLocation(this.serviceContext);
+      boolean wasPaused = "stop".equals(state.getSpyPlayerStatus());
+      if (wasPaused) {
+         state.setSpyPlayerStatus("");
+         if (!state.getModerLocation().isEmpty()) {
+            this.serviceContext.getNotificationService().showToast(
+               NotificationType.SUCCESS, "§a§lУспех", "Слежка возобновлена.", 5.0F
+            );
+         }
+      }
+
+      this.updateSpyTargets();
+   }
+
+   private boolean isModerInHub(StateService state) {
+      if (state.getInHub()) {
+         return true;
+      }
+
+      Minecraft client = this.serviceContext.getMinecraftService().getClient();
+      return client.gameMode != null && client.gameMode.getPlayerMode() == GameType.SPECTATOR;
    }
 
    private void showWarning(String message) {

@@ -14,7 +14,9 @@ import me.xv.holymoderation.event.RenderHudEvent;
 import me.xv.holymoderation.event.ServerConnectEvent;
 import me.xv.holymoderation.event.Subscribe;
 import me.xv.holymoderation.service.ChatService;
+import me.xv.holymoderation.service.ModerPlaytimeService;
 import me.xv.holymoderation.service.StateService;
+import me.xv.holymoderation.service.TabLocationService;
 import me.xv.holymoderation.util.NotificationType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -23,6 +25,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.GameType;
 
 public class CoreModule extends BaseCommandHandler {
+   private int tabLocationScanTicks;
 
    @Subscribe(priority = 101)
    public void onServerConnect(ServerConnectEvent event) {
@@ -65,8 +68,12 @@ public class CoreModule extends BaseCommandHandler {
          if (state.getModerLocation().isEmpty() || event.isSwitch()) {
             if (event.isSwitch()) {
                state.setModerLocation("");
+               state.setModerLocationTrusted(false);
             }
-            this.serviceContext.getChatService().sendChatOrCommand("/find " + state.getModerNickname());
+            TabLocationService.updateModerLocation(this.serviceContext);
+            if (state.getModerLocation().isEmpty()) {
+               ModerPlaytimeService.requestModerLocation(this.serviceContext, true);
+            }
          }
       }
 
@@ -79,9 +86,27 @@ public class CoreModule extends BaseCommandHandler {
 
    @Subscribe(priority = 100)
    public void onClientTick(ClientTickEvent event) {
-      if (this.serviceContext.getStateService().getConnected()) {
-         this.serviceContext.getStateService().setConnected(false);
+      StateService state = this.serviceContext.getStateService();
+      if (state.getConnected()) {
+         state.setConnected(false);
          this.serviceContext.getNotificationService().clearToasts();
+      }
+
+      if (!state.isOnHW() || state.getBlocked() || !state.getGameInitCompleted()) {
+         return;
+      }
+
+      this.tabLocationScanTicks++;
+      if (this.tabLocationScanTicks % 10 != 0) {
+         return;
+      }
+
+      if (state.getModerLocation().isEmpty()) {
+         TabLocationService.updateModerLocation(this.serviceContext);
+      }
+
+      if (state.getModerLocation().isEmpty() && !state.getInHub() && this.tabLocationScanTicks % 20 == 0) {
+         ModerPlaytimeService.requestModerLocation(this.serviceContext);
       }
    }
 
@@ -188,16 +213,16 @@ public class CoreModule extends BaseCommandHandler {
          state.setInHub(true);
          state.setGameInitCompleted(true);
          state.setModerLocation("");
+         state.setModerLocationTrusted(false);
       }
 
       ChatService chat = this.serviceContext.getChatService();
-      if (state.getModerLocation().isEmpty()
-         && message.startsWith("Игрок " + state.getModerNickname())
-         && message.contains("сервере ")) {
+      if (ModerPlaytimeService.tryParseModerPlaytimeResponse(message, state, chat, false)) {
+         return;
+      }
+
+      if (ModerPlaytimeService.shouldHideModerPlaytimeLine(message, chat)) {
          event.setCancelled(true);
-         state.setModerLocation(
-            chat.normalizeServerLocation(message.split("сервере ", 2)[1])
-         );
       }
    }
 
@@ -400,7 +425,7 @@ public class CoreModule extends BaseCommandHandler {
       DebugLogService debug = ServiceRegistry.getDebugLogService();
       if (parts.length == 2) {
          this.serviceContext.getChatService().sendMessage(Component.literal(
-            "§eHolyModeration debug: §6/hm debug on§f, §6/hm debug off§f, §6/hm debug clear§f, §6/hm debug path"
+            "§eHolyModeration debug: §6/hm debug on§f, §6/hm debug off§f, §6/hm debug clear§f, §6/hm debug path§f, §6/hm debug tab"
          ));
          return;
       }
@@ -421,8 +446,12 @@ public class CoreModule extends BaseCommandHandler {
          case "path":
             this.serviceContext.getChatService().sendMessage(Component.literal("§b" + debug.getLogPath()));
             break;
+         case "tab":
+            TabLocationService.dumpDiagnostics(this.serviceContext);
+            this.serviceContext.getChatService().sendMessage(Component.literal("§aTab dump записан в debug-лог."));
+            break;
          default:
-            this.serviceContext.getChatService().sendMessage(Component.literal("§cНеизвестный аргумент. Используй on, off, clear или path."));
+            this.serviceContext.getChatService().sendMessage(Component.literal("§cНеизвестный аргумент. Используй on, off, clear, path или tab."));
             break;
       }
    }

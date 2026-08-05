@@ -23,6 +23,8 @@ public class StateService extends BaseService {
    private String spyPlayerActivity = "";
    private String moderNickname = "";
    private String moderLocation = "";
+   private boolean moderLocationTrusted = false;
+   private String lastAnarchyLocation = "";
    private String vkUrl = "";
    private boolean checkingTwinks = false;
    private int rank = 0;
@@ -45,6 +47,8 @@ public class StateService extends BaseService {
       this.spyPlayerActivity = "";
       this.moderNickname = "";
       this.moderLocation = "";
+      this.moderLocationTrusted = false;
+      this.lastAnarchyLocation = "";
       this.vkUrl = "";
       this.rank = 0;
       this.journalProfile = new HashMap<>();
@@ -134,6 +138,16 @@ public class StateService extends BaseService {
    @Generated
    public String getModerLocation() {
       return this.moderLocation;
+   }
+
+   @Generated
+   public boolean getModerLocationTrusted() {
+      return this.moderLocationTrusted;
+   }
+
+   @Generated
+   public String getLastAnarchyLocation() {
+      return this.lastAnarchyLocation;
    }
 
    @Generated
@@ -244,6 +258,16 @@ public class StateService extends BaseService {
    @Generated
    public void setModerLocation(String text) {
       this.moderLocation = text;
+   }
+
+   @Generated
+   public void setModerLocationTrusted(boolean trusted) {
+      this.moderLocationTrusted = trusted;
+   }
+
+   @Generated
+   public void setLastAnarchyLocation(String text) {
+      this.lastAnarchyLocation = text;
    }
 
    @Generated

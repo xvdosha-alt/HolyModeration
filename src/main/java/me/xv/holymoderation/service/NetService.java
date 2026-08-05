@@ -69,7 +69,16 @@ public class NetService extends BaseService {
    }
 
    public void submitJournalEntry(String username, String reason, String mode, int anarchyNumber, boolean isPvpAnarchy) {
+      JsonObject body = new JsonObject();
+      body.addProperty("username", username);
+      body.addProperty("reason", reason);
+      body.addProperty("mode", mode);
+      body.addProperty("anarchyNumber", anarchyNumber);
+      body.addProperty("isPvpAnarchy", isPvpAnarchy);
+      this.journalLog("start request body=" + body);
+
       if (this.ensureSuccess()) {
+         this.journalLog("start blocked: active checkout on server");
          ServiceRegistry.getNotificationService().showToast(
             NotificationType.ERROR,
             "§c§lОшибка",
@@ -88,32 +97,34 @@ public class NetService extends BaseService {
          }
 
          this.configureConnection(connection);
+         this.journalLog("start token=" + this.describeToken());
 
-         JsonObject body = new JsonObject();
-         body.addProperty("username", username);
-         body.addProperty("reason", reason);
-         body.addProperty("mode", mode);
-         body.addProperty("anarchyNumber", anarchyNumber);
-         body.addProperty("isPvpAnarchy", isPvpAnarchy);
+         if (!this.validateResponse(connection, body)) {
+            this.journalLog("start failed: request body not sent");
+            return;
+         }
 
-         if (this.validateResponse(connection, body)) {
-            if (connection.getResponseCode() == 201) {
-               ServiceRegistry.getNotificationService().showToast(
-                  NotificationType.SUCCESS,
-                  "§a§lУспех",
-                  "Вы успешно внесли проверку в журнал.",
-                  5.0F
-               );
-            } else {
-               ServiceRegistry.getNotificationService().showToast(
-                  NotificationType.ERROR,
-                  "§c§lОшибка",
-                  "Ошибка при внесении проверки. Код: §c" + connection.getResponseCode(),
-                  5.0F
-               );
-            }
+         int responseCode = connection.getResponseCode();
+         String responseBody = this.readRawResponseBody(connection);
+         this.journalLog("start response code=" + responseCode + " body=" + responseBody);
+
+         if (responseCode == 201) {
+            ServiceRegistry.getNotificationService().showToast(
+               NotificationType.SUCCESS,
+               "§a§lУспех",
+               "Вы успешно внесли проверку в журнал.",
+               5.0F
+            );
+         } else {
+            ServiceRegistry.getNotificationService().showToast(
+               NotificationType.ERROR,
+               "§c§lОшибка",
+               "Ошибка при внесении проверки. Код: §c" + responseCode,
+               5.0F
+            );
          }
       } catch (Exception exception) {
+         this.journalLog("start exception=" + exception);
          ServiceRegistry.getNotificationService().showToast(
             NotificationType.EXCEPTION,
             "§4§lИсключение",
@@ -128,7 +139,14 @@ public class NetService extends BaseService {
    }
 
    public void queueJournalEntry(String result, String banReason, boolean destroyStash) {
+      JsonObject body = new JsonObject();
+      body.addProperty("result", result);
+      body.addProperty("banReason", banReason);
+      body.addProperty("destroyStash", destroyStash);
+      this.journalLog("end request body=" + body);
+
       if (!this.ensureSuccess()) {
+         this.journalLog("end blocked: no active checkout on server");
          ServiceRegistry.getNotificationService().showToast(
             NotificationType.ERROR,
             "§c§lОшибка",
@@ -147,30 +165,34 @@ public class NetService extends BaseService {
          }
 
          this.configureConnection(connection);
+         this.journalLog("end token=" + this.describeToken());
 
-         JsonObject body = new JsonObject();
-         body.addProperty("result", result);
-         body.addProperty("banReason", banReason);
-         body.addProperty("destroyStash", destroyStash);
+         if (!this.validateResponse(connection, body)) {
+            this.journalLog("end failed: request body not sent");
+            return;
+         }
 
-         if (this.validateResponse(connection, body)) {
-            if (connection.getResponseCode() == 201) {
-               ServiceRegistry.getNotificationService().showToast(
-                  NotificationType.SUCCESS,
-                  "§a§lУспех",
-                  "Вы успешно закончили проверку в журнале.",
-                  5.0F
-               );
-            } else {
-               ServiceRegistry.getNotificationService().showToast(
-                  NotificationType.ERROR,
-                  "§c§lОшибка",
-                  "Ошибка при завершении проверки. Код: §c" + connection.getResponseCode(),
-                  5.0F
-               );
-            }
+         int responseCode = connection.getResponseCode();
+         String responseBody = this.readRawResponseBody(connection);
+         this.journalLog("end response code=" + responseCode + " body=" + responseBody);
+
+         if (responseCode == 201) {
+            ServiceRegistry.getNotificationService().showToast(
+               NotificationType.SUCCESS,
+               "§a§lУспех",
+               "Вы успешно закончили проверку в журнале.",
+               5.0F
+            );
+         } else {
+            ServiceRegistry.getNotificationService().showToast(
+               NotificationType.ERROR,
+               "§c§lОшибка",
+               "Ошибка при завершении проверки. Код: §c" + responseCode,
+               5.0F
+            );
          }
       } catch (Exception exception) {
+         this.journalLog("end exception=" + exception);
          ServiceRegistry.getNotificationService().showToast(
             NotificationType.EXCEPTION,
             "§4§lИсключение",
@@ -194,10 +216,17 @@ public class NetService extends BaseService {
          }
 
          this.configureConnection(connection);
-         Map<String, Object> response = this.parsePlayersFromResponse(this.readResponseBody(connection));
+         int responseCode = connection.getResponseCode();
+         String responseBody = this.readRawResponseBody(connection);
+         this.journalLog("status response code=" + responseCode + " body=" + responseBody);
+
+         Map<String, Object> response = this.parsePlayersFromResponse(responseBody);
          Object status = response.get("status");
-         return status instanceof Boolean && (Boolean)status;
+         boolean active = status instanceof Boolean && (Boolean)status;
+         this.journalLog("status active=" + active);
+         return active;
       } catch (Exception exception) {
+         this.journalLog("status exception=" + exception);
          ServiceRegistry.getNotificationService().showToast(
             NotificationType.EXCEPTION,
             "§4§lИсключение",
@@ -293,9 +322,19 @@ public class NetService extends BaseService {
 
    public String readResponseBody(@NotNull HttpsURLConnection connection) throws IOException {
       int responseCode = connection.getResponseCode();
+      String body = this.readRawResponseBody(connection);
+      if (responseCode >= 400) {
+         throw new IOException("Server returned HTTP response code: " + responseCode + " for URL: " + connection.getURL());
+      }
+
+      return body;
+   }
+
+   private String readRawResponseBody(@NotNull HttpsURLConnection connection) throws IOException {
+      int responseCode = connection.getResponseCode();
       java.io.InputStream stream = responseCode >= 400 ? connection.getErrorStream() : connection.getInputStream();
       if (stream == null) {
-         throw new IOException("Server returned HTTP response code: " + responseCode + " for URL: " + connection.getURL());
+         return "";
       }
 
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
@@ -306,12 +345,25 @@ public class NetService extends BaseService {
             response.append(line);
          }
 
-         if (responseCode >= 400) {
-            throw new IOException("Server returned HTTP response code: " + responseCode + " for URL: " + connection.getURL());
-         }
-
          return response.toString();
       }
+   }
+
+   private void journalLog(String message) {
+      ServiceRegistry.getDebugLogService().write("journal", message);
+   }
+
+   private String describeToken() {
+      String token = sanitizeApiToken(ServiceRegistry.getConfigManager().getState().getApiToken());
+      if (token.isEmpty()) {
+         return "empty";
+      }
+
+      if (token.length() <= 8) {
+         return "len=" + token.length();
+      }
+
+      return "len=" + token.length() + " prefix=" + token.substring(0, 4) + " suffix=" + token.substring(token.length() - 4);
    }
 
    private Map<String, Object> parsePlayersFromResponse(@NotNull String response) {

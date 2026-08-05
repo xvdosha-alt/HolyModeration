@@ -1,6 +1,5 @@
 package me.xv.holymoderation.command;
 
-import java.awt.Color;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -9,12 +8,16 @@ import me.xv.holymoderation.event.ChatMessageEvent;
 import me.xv.holymoderation.event.CommandEvent;
 import me.xv.holymoderation.event.RenderHudEvent;
 import me.xv.holymoderation.event.Subscribe;
+import me.xv.holymoderation.core.ServiceRegistry;
+import me.xv.holymoderation.gui.HudPanelRenderer;
+import me.xv.holymoderation.gui.HudPanelStyle;
 import me.xv.holymoderation.service.Render2DService;
 import me.xv.holymoderation.service.StateService;
+import me.xv.holymoderation.service.ModerLocationResolver;
+import me.xv.holymoderation.service.ModerPlaytimeService;
 import me.xv.holymoderation.util.NotificationType;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import com.mojang.blaze3d.vertex.PoseStack;
 
 public class FreezerModule extends BaseCommandHandler {
    private static final List<String> CHECKOUT_REASONS = List.of(
@@ -203,19 +206,35 @@ public class FreezerModule extends BaseCommandHandler {
          return;
       }
 
-      String location = this.serviceContext.getStateService().getModerLocation();
+      final String resolvedLocation = ModerLocationResolver.resolve(this.serviceContext, player);
+      ServiceRegistry.getDebugLogService().write(
+         "journal",
+         "prepare startcheckout player=" + player
+            + " reason=" + reason
+            + " location=" + resolvedLocation
+            + " inHub=" + this.serviceContext.getStateService().getInHub()
+      );
+      if (resolvedLocation.isBlank()) {
+         ModerPlaytimeService.requestModerLocation(this.serviceContext, true);
+         this.showError("Анархия не определена. Подожди 1-2 сек и нажми кнопку снова.");
+         return;
+      }
+
+      this.serviceContext.getStateService().setModerLocation(resolvedLocation);
       String mode;
-      if (location.startsWith("lite120")) {
+      if (resolvedLocation.startsWith("lite120")) {
          mode = "lite120";
-      } else if (location.startsWith("lite")) {
+      } else if (resolvedLocation.startsWith("lite")) {
          mode = "lite";
-      } else if (location.startsWith("classic")) {
+      } else if (resolvedLocation.startsWith("classic")) {
          mode = "classic";
+      } else if (resolvedLocation.startsWith("prime")) {
+         mode = "prime";
       } else {
          mode = "lpvp";
       }
 
-      CompletableFuture.runAsync(() -> this.submitStartCheckoutJournal(mode, player, reason, location));
+      CompletableFuture.runAsync(() -> this.submitStartCheckoutJournal(mode, player, reason, resolvedLocation));
       this.setCheckoutStartMillis(player);
    }
 
@@ -344,30 +363,40 @@ public class FreezerModule extends BaseCommandHandler {
 
       GuiGraphics graphics = event.getGuiGraphics();
       Font font = this.serviceContext.getMinecraftService().getClient().font;
+      Render2DService render = this.serviceContext.getRender2DService();
 
       long elapsedSeconds = this.checkoutStartMillis == 0L
          ? 0L
          : (System.currentTimeMillis() - this.checkoutStartMillis) / 1000L;
       String timer = String.format("%d:%02d", elapsedSeconds / 60L, elapsedSeconds % 60L);
       String displayPlayer = player.isEmpty() ? this.coLastPlayer : player;
-      String label = "Текущая проверка: " + displayPlayer + " | " + timer;
+      HudPanelRenderer.Content content = new HudPanelRenderer.Content(
+         "CHECK",
+         "§f" + displayPlayer,
+         "§d§l" + timer + " §7| проверка"
+      );
 
-      float boxWidth = font.width(label) + 16.0F;
-      float boxHeight = 9.0F + 12.0F;
+      float boxWidth = HudPanelRenderer.measureWidth(font, content);
+      float boxHeight = HudPanelRenderer.measureHeight(font, content);
       this.coCurrentWidth += (boxWidth - this.coCurrentWidth) * 0.2F;
       this.coCurrentHeight += (boxHeight - this.coCurrentHeight) * 0.2F;
 
       float renderWidth = Math.max(1.0F, this.coCurrentWidth * this.coAnim);
       float renderHeight = Math.max(1.0F, this.coCurrentHeight * this.coAnim);
       float centerX = graphics.guiWidth() / 2.0F;
-      float x = centerX - renderWidth / 2.0F;
-      float y = graphics.guiHeight() - 90.0F;
+      float y = graphics.guiHeight() - renderHeight - 92.0F;
 
-      Color background = new Color(10, 20, 40, 220);
-      Color outline = new Color(60, 120, 220);
-      Render2DService render = this.serviceContext.getRender2DService();
-      render.drawSoftRoundedRectOutline(graphics, x, y, renderWidth, renderHeight, 10.0F, background, outline, 1.5F, 3.0F);
-      render.drawText(font, label, centerX - font.width(label) / 2.0F, y + 6.0F, -1, false, graphics);
+      HudPanelRenderer.drawCentered(
+         render,
+         graphics,
+         font,
+         centerX,
+         y,
+         renderWidth,
+         renderHeight,
+         HudPanelStyle.checkout(),
+         content
+      );
 
       if (this.coAnim < 0.02F && this.coAnimTarget == 0.0F && this.coClearDisplayWhenHidden) {
          this.checkoutStartMillis = 0L;
@@ -418,6 +447,15 @@ public class FreezerModule extends BaseCommandHandler {
    }
 
    private void submitStartCheckoutJournal(String mode, String player, String reason, String location) {
+      if (location == null || location.isBlank() || !ModerLocationResolver.isAnarchyLocation(location)) {
+         ServiceRegistry.getDebugLogService().write(
+            "journal",
+            "submit blocked invalid location=" + location + " player=" + player
+         );
+         this.showError("Не удалось определить анархию для журнала.");
+         return;
+      }
+
       int serverNumber = 1;
       if (location != null && !location.isBlank()) {
          int dashIndex = location.lastIndexOf('-');
@@ -430,6 +468,15 @@ public class FreezerModule extends BaseCommandHandler {
       }
 
       boolean isPvpAnarchy = "lpvp".equals(mode);
+      ServiceRegistry.getDebugLogService().write(
+         "journal",
+         "submit startcheckout player=" + player
+            + " reason=" + reason
+            + " mode=" + mode
+            + " anarchyNumber=" + serverNumber
+            + " isPvpAnarchy=" + isPvpAnarchy
+            + " location=" + location
+      );
       this.serviceContext.getNetService().submitJournalEntry(player, reason, mode, serverNumber, isPvpAnarchy);
    }
 

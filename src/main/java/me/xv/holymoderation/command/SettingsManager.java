@@ -145,6 +145,7 @@ public class SettingsManager extends BaseCommandHandler {
             break;
          case "me":
             CompletableFuture.runAsync(this::dispatchSettings);
+            break;
          case "stats":
             this.showModeratorStats();
             break;
@@ -324,16 +325,17 @@ public class SettingsManager extends BaseCommandHandler {
          if (revisesAll != null && revisesMonth != null && revisesWeek != null && revisesToday != null) {
             message = "§d§lСТАТИСТИКА ПРОВЕРОК\n§fПроверок за всё время: §b§l"
                + this.parseStat(revisesAll, "total") + " (лайт: " + this.parseStat(revisesAll, "lite")
-               + ", лайт 1.20: " + this.parseStat(revisesAll, "lite120") + ", классик: " + this.parseStat(revisesAll, "classic") + ")\n"
+               + ", лайт 1.20: " + this.parseStat(revisesAll, "lite120") + ", классик: " + this.parseStat(revisesAll, "classic")
+               + ", прайм: " + this.parseStat(revisesAll, "prime") + ")\n"
                + "§fПроверок за последний месяц: §b§l" + this.parseStat(revisesMonth, "total")
                + " (лайт: " + this.parseStat(revisesMonth, "lite") + ", лайт 1.20: " + this.parseStat(revisesMonth, "lite120")
-               + ", классик: " + this.parseStat(revisesMonth, "classic") + ")\n"
+               + ", классик: " + this.parseStat(revisesMonth, "classic") + ", прайм: " + this.parseStat(revisesMonth, "prime") + ")\n"
                + "§fПроверок за последнюю неделю: §b§l" + this.parseStat(revisesWeek, "total")
                + " (лайт: " + this.parseStat(revisesWeek, "lite") + ", лайт 1.20: " + this.parseStat(revisesWeek, "lite120")
-               + ", классик: " + this.parseStat(revisesWeek, "classic") + ")\n"
+               + ", классик: " + this.parseStat(revisesWeek, "classic") + ", прайм: " + this.parseStat(revisesWeek, "prime") + ")\n"
                + "§fПроверок за сегодня: §b§l" + this.parseStat(revisesToday, "total")
                + " (лайт: " + this.parseStat(revisesToday, "lite") + ", лайт 1.20: " + this.parseStat(revisesToday, "lite120")
-               + ", классик: " + this.parseStat(revisesToday, "classic") + ")\n";
+               + ", классик: " + this.parseStat(revisesToday, "classic") + ", прайм: " + this.parseStat(revisesToday, "prime") + ")\n";
          }
 
          message = message
@@ -358,7 +360,11 @@ public class SettingsManager extends BaseCommandHandler {
    }
 
    private int parseStat(Map<?, ?> map, String key) {
-      return (int)Double.parseDouble(map.get(key).toString());
+      Object value = map.get(key);
+      if (value == null) {
+         return 0;
+      }
+      return (int)Double.parseDouble(value.toString());
    }
 
    private void showSuccess(String message) {

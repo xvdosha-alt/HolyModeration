@@ -44,13 +44,10 @@ public class NotificationService extends BaseService {
       float deltaTime = (now - this.lastNano) / 1.0E9F;
       this.lastNano = now;
 
-      float margin = 8.0F;
-      float spacing = 10.0F;
-      float maxWrapWidth = Math.max(120.0F, screenWidth / 6.0F);
-      float cornerRadius = 6.0F;
-      float blurWidth = 6.0F;
-      float outlineWidth = 1.5F;
-      float padding = 8.0F;
+      float margin = 10.0F;
+      float spacing = 8.0F;
+      float maxWrapWidth = Math.max(140.0F, screenWidth / 5.5F);
+      float padding = 10.0F;
       int wrapWidth = Math.max(1, (int)(maxWrapWidth - padding * 2.0F));
 
       for (ActiveNotification notification : this.notificationPool) {
@@ -67,7 +64,7 @@ public class NotificationService extends BaseService {
          notification.width = maxWrapWidth;
          notification.height = padding
             + notification.titleLines.size() * 9.0F
-            + 4.0F
+            + 3.0F
             + notification.bodyLines.size() * 9.0F
             + padding;
       }
@@ -115,29 +112,27 @@ public class NotificationService extends BaseService {
       this.notificationPool.removeIf(NotificationService::shouldRemove);
 
       for (ActiveNotification notification : this.notificationPool) {
-         render2DService.drawSoftRoundedRectOutline(
+         render2DService.drawToastPanel(
             graphics,
-            notification.x,
-            notification.y,
-            notification.width,
-            notification.height,
-            cornerRadius,
+            Math.round(notification.x),
+            Math.round(notification.y),
+            Math.round(notification.width),
+            Math.round(notification.height),
             notification.type.getBackgroundColor(),
             notification.type.getOutlineColor(),
-            outlineWidth,
-            blurWidth
+            notification.type.getOutlineColor()
          );
 
-         float textX = notification.x + padding;
+         float textX = notification.x + padding + 4.0F;
          float textY = notification.y + padding;
          for (FormattedCharSequence line : notification.titleLines) {
             graphics.drawString(font, line, (int)textX, (int)textY, TEXT_COLOR, true);
             textY += font.lineHeight;
          }
 
-         textY += 4.0F;
+         textY += 2.0F;
          for (FormattedCharSequence line : notification.bodyLines) {
-            graphics.drawString(font, line, (int)textX, (int)textY, TEXT_COLOR, true);
+            graphics.drawString(font, line, (int)textX, (int)textY, 0xFFE8EEF8, true);
             textY += font.lineHeight;
          }
       }
