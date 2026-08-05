@@ -40,10 +40,37 @@ public final class ModCommands {
       return builder.buildFuture();
    };
 
-   private static final SuggestionProvider<FabricClientCommandSource> DURATIONS = (context, builder) -> {
-      for (String duration : new String[]{"1d", "7d", "14d", "20d", "30d", "60d", "90d"}) {
+   private static final SuggestionProvider<FabricClientCommandSource> SBAN_DURATIONS = (context, builder) -> {
+      for (String duration : new String[]{"30d", "20d"}) {
          if (SharedSuggestionProvider.matchesSubStr(builder.getRemaining(), duration)) {
             builder.suggest(duration);
+         }
+      }
+      return builder.buildFuture();
+   };
+
+   private static final SuggestionProvider<FabricClientCommandSource> SBAN_REASONS = (context, builder) -> {
+      String duration;
+      try {
+         duration = StringArgumentType.getString(context, "duration");
+      } catch (IllegalArgumentException ignored) {
+         return builder.buildFuture();
+      }
+
+      String[] reasons = switch (duration.toLowerCase()) {
+         case "20d" -> new String[]{"Признание"};
+         case "30d" -> new String[]{
+            "Помеха проверке",
+            "Отказ от проверки",
+            "Неадекват на проверке",
+            "Время вышло"
+         };
+         default -> new String[0];
+      };
+
+      for (String reason : reasons) {
+         if (SharedSuggestionProvider.matchesSubStr(builder.getRemaining(), reason)) {
+            builder.suggest(reason);
          }
       }
       return builder.buildFuture();
@@ -82,9 +109,10 @@ public final class ModCommands {
          ClientCommandManager.literal("sban")
             .then(
                ClientCommandManager.argument("duration", StringArgumentType.word())
-                  .suggests(DURATIONS)
+                  .suggests(SBAN_DURATIONS)
                   .then(
                      ClientCommandManager.argument("reason", StringArgumentType.greedyString())
+                        .suggests(SBAN_REASONS)
                         .executes(ctx -> dispatch(
                            "hm sban "
                               + StringArgumentType.getString(ctx, "duration") + " "
