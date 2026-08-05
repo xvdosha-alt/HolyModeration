@@ -15,7 +15,7 @@ Fabric-мод для модерации на **Minecraft 1.21.11**.
 
 1. Установи [Fabric Loader](https://fabricmc.net/use/) для Minecraft **1.21.11**
 2. Скачай **Fabric API** (`0.141.6+1.21.11`) и положи в `mods/`
-3. Скачай `HolyModeration-2.10alpha.jar` из [Releases](https://github.com/xvdosha-alt/HolyModeration/releases)
+3. Скачай `HolyModeration-21-11.jar` из [Releases](https://github.com/xvdosha-alt/HolyModeration/releases)
 4. Положи JAR в папку `mods/` клиента
 5. Запусти игру
 
@@ -23,7 +23,7 @@ Fabric-мод для модерации на **Minecraft 1.21.11**.
 .minecraft/
   mods/
     fabric-api-0.141.6+1.21.11.jar
-    HolyModeration-2.10alpha.jar
+    HolyModeration-21-11.jar
 ```
 
 ## Первый запуск
@@ -99,7 +99,7 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 Готовый JAR:
 
 ```
-build/libs/HolyModeration-2.10alpha.jar
+build/libs/HolyModeration-21-11.jar
 ```
 
 Запуск клиента для отладки:

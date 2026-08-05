@@ -152,8 +152,6 @@ public final class ModCommands {
       }
 
       dispatcher.register(hm);
-      registerRootPlayerCommand(dispatcher, "frz");
-      registerRootPlayerCommand(dispatcher, "freezing");
    }
 
    private static void registerSpyCommand(LiteralArgumentBuilder<FabricClientCommandSource> hm) {
@@ -167,20 +165,6 @@ public final class ModCommands {
             .executes(ctx -> dispatch("hm spy " + StringArgumentType.getString(ctx, "player")))
       );
       hm.then(spy);
-   }
-
-   private static void registerRootPlayerCommand(
-      CommandDispatcher<FabricClientCommandSource> dispatcher,
-      String command
-   ) {
-      dispatcher.register(
-         ClientCommandManager.literal(command)
-            .then(
-               ClientCommandManager.argument("player", StringArgumentType.word())
-                  .suggests(ONLINE_PLAYERS)
-                  .executes(ctx -> dispatch(command + " " + StringArgumentType.getString(ctx, "player")))
-            )
-      );
    }
 
    private static void registerPlayerCommand(

@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
+import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
 import net.minecraft.ChatFormatting;
 
 public class ChatService extends BaseService {
@@ -51,14 +52,17 @@ public class ChatService extends BaseService {
    public final String[] FourArgCommands = new String[]{"endcheckout"};
 
    public void sendChatOrCommand(String text) {
-      ServiceRegistry.getMinecraftService().getClient().execute(() -> {
-         ClientPacketListener handler = ServiceRegistry.getMinecraftService().getClient().getConnection();
-         if (handler != null) {
-            if (text.startsWith("/")) {
-               handler.sendCommand(text.substring(1));
-            } else {
-               handler.sendChat(text);
-            }
+      Minecraft client = ServiceRegistry.getMinecraftService().getClient();
+      client.execute(() -> {
+         ClientPacketListener handler = client.getConnection();
+         if (handler == null) {
+            return;
+         }
+
+         if (text.startsWith("/")) {
+            handler.getConnection().send(new ServerboundChatCommandPacket(text.substring(1)));
+         } else {
+            handler.sendChat(text);
          }
       });
    }

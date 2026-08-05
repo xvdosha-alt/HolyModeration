@@ -48,3 +48,15 @@ jar {
         rename { "${it}_${project.base.archivesName.get()}" }
     }
 }
+
+remapJar {
+    archiveFileName = 'HolyModeration-21-11.jar'
+}
+
+remapSourcesJar {
+    archiveFileName = 'HolyModeration-21-11-sources.jar'
+}
+
+sourcesJar {
+    archiveFileName = 'HolyModeration-21-11-sources.jar'
+}
