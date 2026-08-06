@@ -120,7 +120,7 @@ public class CoreModule extends BaseCommandHandler {
 
       if (parts.length == 1) {
          this.serviceContext.getChatService().sendMessage(
-            Component.literal("§eHolyModeration: §6/hm enable§f, §6/hm stats§f, §6/hm sounds§f, §6/hm setapitoken <token>")
+            Component.literal("§eHolyModeration: §6/hm enable§f, §6/hm stats§f, §6/hm setvk <vk.com/id>§f, §6/hm setapitoken <token>")
          );
          return;
       }
@@ -129,6 +129,9 @@ public class CoreModule extends BaseCommandHandler {
       switch (subCommand) {
          case "setapitoken":
             this.handleSetApiTokenCommand(parts);
+            return;
+         case "setvk":
+            this.handleSetVkCommand(parts);
             return;
          case "cleartoasts":
             this.serviceContext.getNotificationService().clearToasts();
@@ -419,6 +422,36 @@ public class CoreModule extends BaseCommandHandler {
             }));
          });
       });
+   }
+
+   private void handleSetVkCommand(String[] parts) {
+      if (parts.length < 3) {
+         this.showError("Вы не ввели ссылку на VK.");
+         return;
+      }
+
+      String vk = String.join(" ", Arrays.copyOfRange(parts, 2, parts.length)).trim();
+      vk = vk.replace("https://", "").replace("http://", "");
+      if (vk.startsWith("www.")) {
+         vk = vk.substring(4);
+      }
+      if (!vk.matches("(?i)vk\\.com/(id\\d+|[\\w.]+)")) {
+         this.showError("Формат: vk.com/id123");
+         return;
+      }
+
+      ModState modState = this.serviceContext.getConfigManager().getState();
+      modState.setVkUrl(vk);
+      this.serviceContext.getConfigManager().save(modState);
+      this.serviceContext.getStateService().setVkUrl(vk);
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.SUCCESS,
+         "§a§lУспех",
+         "VK сохранён: " + vk,
+         5.0F
+      );
+      this.serviceContext.getChatService().sendMessage(Component.literal("§aVK сохранён: §f" + vk));
+      this.serviceContext.getSoundService().playSound("success.wav");
    }
 
    private void handleDebugCommand(String[] parts) {

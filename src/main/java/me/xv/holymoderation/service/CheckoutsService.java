@@ -191,48 +191,13 @@ public class CheckoutsService extends BaseService {
       }
 
       String player = context.getStateService().getPlayer();
-      sendClickableMessages(context, new String[][]{
-         {
-            "§b§lВнести проверку по репорту",
-            "Нажмите, чтобы внести проверку по репорту",
-            "/hm startcheckout " + player + " report"
-         },
-         {
-            "§b§lВнести обычную проверку",
-            "Нажмите, чтобы внести обычную проверку",
-            "/hm startcheckout " + player + " checkout"
-         },
-         {
-            "§b§lВнести проверку автобаера",
-            "Нажмите, чтобы внести проверку автобаера",
-            "/hm startcheckout " + player + " autobuy"
-         },
-         {
-            "§b§lВнести проверку автоселлера",
-            "Нажмите, чтобы внести проверку автоселлера",
-            "/hm startcheckout " + player + " autosell"
-         },
-         {
-            "§b§lВнести проверку кандидата",
-            "Нажмите, чтобы внести проверку кандидата",
-            "/hm startcheckout " + player + " candidate"
-         },
-         {
-            "§b§lВнести проверку кастомки",
-            "Нажмите, чтобы внести проверку кастомки",
-            "/hm startcheckout " + player + " customka"
-         },
-         {
-            "§b§lВнести проверку персонала",
-            "Нажмите, чтобы внести проверку персонала",
-            "/hm startcheckout " + player + " personal"
-         },
-         {
-            "§b§lВнести проверку игрока, у которого много пройденных проверок",
-            "Нажмите, чтобы внести проверку игрока, у которого много пройденных проверок",
-            "/hm startcheckout " + player + " toManyChecks"
-         }
-      });
+      context.getChatService().copyToClipboard(player);
+      context.getNotificationService().showToast(
+         NotificationType.SUCCESS,
+         "§a§lУспех",
+         "Ник проверяемого скопирован: " + player,
+         5.0F
+      );
    }
 
    private static void scheduleCheckoutTimeout(ServiceContext context) {

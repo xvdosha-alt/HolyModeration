@@ -14,6 +14,8 @@ public class ModState {
    @Expose
    private String apiToken = "";
    @Expose
+   private String vkUrl = "";
+   @Expose
    private boolean soundsEnabled = true;
    @Expose
    private int soundsVolume = 70;
@@ -94,6 +96,11 @@ public class ModState {
    @Generated
    public String getApiToken() {
       return this.apiToken;
+   }
+
+   @Generated
+   public String getVkUrl() {
+      return this.vkUrl;
    }
 
    @Generated
@@ -219,6 +226,11 @@ public class ModState {
    @Generated
    public void setApiToken(String text) {
       this.apiToken = text;
+   }
+
+   @Generated
+   public void setVkUrl(String text) {
+      this.vkUrl = text == null ? "" : text;
    }
 
    @Generated

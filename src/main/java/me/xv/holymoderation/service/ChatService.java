@@ -47,7 +47,7 @@ public class ChatService extends BaseService {
       "cleartoasts"
    };
    public final String[] PlayerCommands = new String[]{"freezing", "frz", "sendtexts", "spy"};
-   public final String[] OneArgCommands = new String[]{"setapitoken", "setcopy", "setmarker", "setspydelay", "textadd", "textremove", "setsoundsvolume"};
+   public final String[] OneArgCommands = new String[]{"setapitoken", "setvk", "setcopy", "setmarker", "setspydelay", "textadd", "textremove", "setsoundsvolume"};
    public final String[] TwoArgCommands = new String[]{};
    public final String[] FourArgCommands = new String[]{"endcheckout"};
 

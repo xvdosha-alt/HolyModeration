@@ -2,6 +2,7 @@ package me.xv.holymoderation.command;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import me.xv.holymoderation.config.ModState;
 import me.xv.holymoderation.event.CommandEvent;
 import me.xv.holymoderation.event.ServerConnectEvent;
 import me.xv.holymoderation.event.Subscribe;
@@ -58,10 +59,14 @@ public class UpdaterModule extends BaseCommandHandler {
       }
 
       var state = this.serviceContext.getStateService();
+      String vk = "vk.com/id" + (long)Double.parseDouble(profile.get("idVk").toString());
+      ModState modState = this.serviceContext.getConfigManager().getState();
+      modState.setVkUrl(vk);
+      this.serviceContext.getConfigManager().save(modState);
       state.setJournalProfile(profile);
       state.setJournalStats(this.serviceContext.getNetService().getCheckoutSessions());
       state.setRank((int)Double.parseDouble(profile.get("rank").toString()));
-      state.setVkUrl("vk.com/id" + (long)Double.parseDouble(profile.get("idVk").toString()));
+      state.setVkUrl(vk);
       this.serviceContext.getNotificationService().showToast(
          NotificationType.SUCCESS, "§a§lУспех", "Синхронизация завершена!", 5.0F
       );

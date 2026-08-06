@@ -57,6 +57,7 @@ public class HolyModerationClient implements ClientModInitializer {
       HudPanelDragSetup.register();
       ClientCommandRegistrationCallback.EVENT.register(ModCommands::register);
       ServiceRegistry.getDebugLogService().write("system", "log file: " + ServiceRegistry.getDebugLogService().getLogPath());
+      ServiceRegistry.getStateService().setVkUrl(ServiceRegistry.getConfigManager().getState().getVkUrl());
       ServiceRegistry.getLoggerService().logger().info("HolyModerationClient has been initialized");
    }
 

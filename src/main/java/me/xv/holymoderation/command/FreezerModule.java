@@ -212,6 +212,14 @@ public class FreezerModule extends BaseCommandHandler {
          return;
       }
 
+      this.serviceContext.getChatService().copyToClipboard(player);
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.SUCCESS,
+         "§a§lУспех",
+         "Ник проверяемого скопирован: " + player,
+         5.0F
+      );
+
       final String resolvedLocation = ModerLocationResolver.resolve(this.serviceContext, player);
       ServiceRegistry.getDebugLogService().write(
          "journal",
