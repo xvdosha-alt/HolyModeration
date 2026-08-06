@@ -3,6 +3,7 @@ package me.xv.holymoderation.service;
 import java.util.ArrayList;
 import java.util.List;
 import me.xv.holymoderation.core.BaseService;
+import me.xv.holymoderation.core.ModBuild;
 import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.util.NotificationType;
 import net.minecraft.client.gui.Font;
@@ -15,11 +16,17 @@ public class NotificationService extends BaseService {
    private long lastNano = System.nanoTime();
 
    public void showToast(NotificationType type, String title, String text, float liveTime) {
+      if (ModBuild.BARE) {
+         return;
+      }
       this.notificationPool.add(new ActiveNotification(type, title, text, liveTime));
       ServiceRegistry.getSoundService().playSound(type.getSoundName());
    }
 
    public void showToastWithAction(NotificationType type, String title, String text, float liveTime, String soundName) {
+      if (ModBuild.BARE) {
+         return;
+      }
       this.notificationPool.add(new ActiveNotification(type, title, text, liveTime));
       if (!soundName.isEmpty()) {
          ServiceRegistry.getSoundService().playSound(soundName);
@@ -31,6 +38,9 @@ public class NotificationService extends BaseService {
    }
 
    public void renderToasts(GuiGraphics graphics) {
+      if (ModBuild.BARE) {
+         return;
+      }
       float screenWidth = graphics.guiWidth();
       float screenHeight = graphics.guiHeight();
       if (screenWidth < 64.0F || screenHeight < 64.0F) {

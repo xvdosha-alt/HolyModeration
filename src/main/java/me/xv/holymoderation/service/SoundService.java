@@ -7,11 +7,12 @@ import javax.sound.sampled.Clip;
 import javax.sound.sampled.FloatControl;
 import javax.sound.sampled.LineEvent;
 import me.xv.holymoderation.core.BaseService;
+import me.xv.holymoderation.core.ModBuild;
 import me.xv.holymoderation.core.ServiceRegistry;
 
 public class SoundService extends BaseService {
    public void playSound(String fileName) {
-      if (!ServiceRegistry.getConfigManager().getState().getSoundsEnabled()) {
+      if (ModBuild.BARE || !ServiceRegistry.getConfigManager().getState().getSoundsEnabled()) {
          return;
       }
 

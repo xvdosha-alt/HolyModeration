@@ -11,6 +11,8 @@ base {
     archivesName = project.archives_base_name
 }
 
+def bareMode = project.findProperty('bare')?.toString()?.toBoolean() ?: false
+
 repositories {
     mavenCentral()
 }
@@ -25,11 +27,50 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok:1.18.34'
 }
 
+def generatedModBuildDir = layout.buildDirectory.dir('generated/sources/modbuild')
+
+tasks.register('generateModBuild') {
+    outputs.dir generatedModBuildDir
+    doLast {
+        def outDir = generatedModBuildDir.get().asFile
+        def pkg = new File(outDir, 'me/xv/holymoderation/core')
+        pkg.mkdirs()
+        new File(pkg, 'ModBuild.java').text = """package me.xv.holymoderation.core;
+
+public final class ModBuild {
+   public static final boolean BARE = ${bareMode};
+   public static final boolean JOURNAL_API = false;
+
+   private ModBuild() {
+   }
+}
+"""
+    }
+}
+
+sourceSets.main.java.srcDir generatedModBuildDir
+
+tasks.named('compileJava').configure {
+    dependsOn tasks.named('generateModBuild')
+}
+
+afterEvaluate {
+    tasks.matching { it.name == 'sourcesJar' }.configureEach {
+        dependsOn tasks.named('generateModBuild')
+    }
+}
+
 processResources {
     inputs.property 'version', project.version
+    inputs.property 'mod_id', bareMode ? 'hmclient' : 'holymoderation'
+    inputs.property 'mod_name', bareMode ? 'Client Utils' : 'HolyModeration'
+    inputs.property 'mod_description', bareMode ? 'Client-side utilities' : 'An auxiliary mod for moderation on HolyWorld'
 
     filesMatching('fabric.mod.json') {
-        expand 'version': project.version
+        expand 'version': project.version,
+            'mod_id': bareMode ? 'hmclient' : 'holymoderation',
+            'mod_name': bareMode ? 'Client Utils' : 'HolyModeration',
+            'mod_description': bareMode ? 'Client-side utilities' : 'An auxiliary mod for moderation on HolyWorld'
     }
 }
 
@@ -50,13 +91,20 @@ jar {
 }
 
 remapJar {
-    archiveFileName = 'HolyModeration-21-11.jar'
+    archiveFileName = bareMode ? 'HolyModeration-bare-21-11.jar' : 'HolyModeration-21-11.jar'
 }
 
 remapSourcesJar {
-    archiveFileName = 'HolyModeration-21-11-sources.jar'
+    archiveFileName = bareMode ? 'HolyModeration-bare-21-11-sources.jar' : 'HolyModeration-21-11-sources.jar'
 }
 
 sourcesJar {
-    archiveFileName = 'HolyModeration-21-11-sources.jar'
+    archiveFileName = bareMode ? 'HolyModeration-bare-21-11-sources.jar' : 'HolyModeration-21-11-sources.jar'
+}
+
+tasks.register('buildBare', GradleBuild) {
+    group = 'build'
+    description = 'Build stealth bare jar without HUD, toasts, or chat markers'
+    tasks = [':clean', ':build']
+    startParameter.projectProperties = [bare: 'true']
 }

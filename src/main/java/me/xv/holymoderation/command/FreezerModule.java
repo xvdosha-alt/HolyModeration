@@ -2,7 +2,6 @@ package me.xv.holymoderation.command;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import me.xv.holymoderation.config.ModState;
 import me.xv.holymoderation.event.ChatMessageEvent;
 import me.xv.holymoderation.event.CommandEvent;
@@ -15,8 +14,6 @@ import me.xv.holymoderation.gui.HudPanelStyle;
 import me.xv.holymoderation.gui.HudPanelType;
 import me.xv.holymoderation.service.Render2DService;
 import me.xv.holymoderation.service.StateService;
-import me.xv.holymoderation.service.ModerLocationResolver;
-import me.xv.holymoderation.service.ModerPlaytimeService;
 import me.xv.holymoderation.util.NotificationType;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -219,36 +216,6 @@ public class FreezerModule extends BaseCommandHandler {
          "Ник проверяемого скопирован: " + player,
          5.0F
       );
-
-      final String resolvedLocation = ModerLocationResolver.resolve(this.serviceContext, player);
-      ServiceRegistry.getDebugLogService().write(
-         "journal",
-         "prepare startcheckout player=" + player
-            + " reason=" + reason
-            + " location=" + resolvedLocation
-            + " inHub=" + this.serviceContext.getStateService().getInHub()
-      );
-      if (resolvedLocation.isBlank()) {
-         ModerPlaytimeService.requestModerLocation(this.serviceContext, true);
-         this.showError("Анархия не определена. Подожди 1-2 сек и нажми кнопку снова.");
-         return;
-      }
-
-      this.serviceContext.getStateService().setModerLocation(resolvedLocation);
-      String mode;
-      if (resolvedLocation.startsWith("lite120")) {
-         mode = "lite120";
-      } else if (resolvedLocation.startsWith("lite")) {
-         mode = "lite";
-      } else if (resolvedLocation.startsWith("classic")) {
-         mode = "classic";
-      } else if (resolvedLocation.startsWith("prime")) {
-         mode = "prime";
-      } else {
-         mode = "lpvp";
-      }
-
-      CompletableFuture.runAsync(() -> this.submitStartCheckoutJournal(mode, player, reason, resolvedLocation));
       this.setCheckoutStartMillis(player);
    }
 
@@ -269,7 +236,30 @@ public class FreezerModule extends BaseCommandHandler {
          ServiceRegistry.getDebugLogService().write("checkout", "released on endcheckout result=" + result);
       }
 
-      CompletableFuture.runAsync(() -> this.finishEndCheckoutJournal(result, parts));
+      if ("ban".equals(result)) {
+         if (parts.length < 5) {
+            this.showError("Вы не указали ник игрока и необходимость снести стеш.");
+            return;
+         }
+
+         String destroyStashValue = parts[4];
+         if (!DESTROY_STASH_VALUES.contains(destroyStashValue)) {
+            this.showError("Некорректная необходимость снести стеш.");
+            return;
+         }
+
+         this.destroyStash = "true".equals(destroyStashValue);
+         this.banChecking = true;
+         this.serviceContext.getChatService().sendChatOrCommand("/checkban " + parts[3]);
+      } else {
+         this.serviceContext.getNotificationService().showToast(
+            NotificationType.SUCCESS,
+            "§a§lУспех",
+            "Результат проверки: " + result,
+            5.0F
+         );
+      }
+
       this.hideCheckoutHud();
    }
 
@@ -333,7 +323,6 @@ public class FreezerModule extends BaseCommandHandler {
       if (message.startsWith("IP бан:")) {
          this.messageIsCheckbanInfo = false;
          this.banChecking = false;
-         CompletableFuture.runAsync(this::queueBanJournal);
       }
    }
 
@@ -370,6 +359,9 @@ public class FreezerModule extends BaseCommandHandler {
 
    @Subscribe
    public void onFrzRenderHud(RenderHudEvent event) {
+      if (me.xv.holymoderation.core.ModBuild.BARE) {
+         return;
+      }
       this.coAnim += (this.coAnimTarget - this.coAnim) * 0.15F;
 
       String player = this.serviceContext.getStateService().getPlayer();
@@ -473,70 +465,6 @@ public class FreezerModule extends BaseCommandHandler {
          || lower.contains("лив");
       boolean checkoutHint = lower.contains("заморож") || lower.contains("провер");
       return leaveHint && checkoutHint;
-   }
-
-   private void queueBanJournal() {
-      this.serviceContext.getNetService().queueJournalEntry("ban", this.banReason, this.destroyStash);
-   }
-
-   private void finishEndCheckoutJournal(String result, String[] parts) {
-      if ("ban".equals(result)) {
-         if (parts.length < 5) {
-            this.showError("Вы не указали ник игрока и необходимость снести стеш.");
-            return;
-         }
-
-         String destroyStashValue = parts[4];
-         if (!DESTROY_STASH_VALUES.contains(destroyStashValue)) {
-            this.showError("Некорректная необходимость снести стеш.");
-            return;
-         }
-
-         this.destroyStash = "true".equals(destroyStashValue);
-         this.banChecking = true;
-         this.serviceContext.getChatService().sendChatOrCommand("/checkban " + parts[3]);
-
-         if (parts.length >= 6) {
-            this.serviceContext.getNetService().queueJournalEntry(result, parts[5], this.destroyStash);
-         }
-         return;
-      }
-
-      this.serviceContext.getNetService().queueJournalEntry(result, result, false);
-   }
-
-   private void submitStartCheckoutJournal(String mode, String player, String reason, String location) {
-      if (location == null || location.isBlank() || !ModerLocationResolver.isAnarchyLocation(location)) {
-         ServiceRegistry.getDebugLogService().write(
-            "journal",
-            "submit blocked invalid location=" + location + " player=" + player
-         );
-         this.showError("Не удалось определить анархию для журнала.");
-         return;
-      }
-
-      int serverNumber = 1;
-      if (location != null && !location.isBlank()) {
-         int dashIndex = location.lastIndexOf('-');
-         if (dashIndex >= 0 && dashIndex + 1 < location.length()) {
-            try {
-               serverNumber = Integer.parseInt(location.substring(dashIndex + 1));
-            } catch (NumberFormatException ignored) {
-            }
-         }
-      }
-
-      boolean isPvpAnarchy = "lpvp".equals(mode);
-      ServiceRegistry.getDebugLogService().write(
-         "journal",
-         "submit startcheckout player=" + player
-            + " reason=" + reason
-            + " mode=" + mode
-            + " anarchyNumber=" + serverNumber
-            + " isPvpAnarchy=" + isPvpAnarchy
-            + " location=" + location
-      );
-      this.serviceContext.getNetService().submitJournalEntry(player, reason, mode, serverNumber, isPvpAnarchy);
    }
 
    private void showWarning(String message) {

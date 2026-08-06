@@ -1,10 +1,13 @@
 package me.xv.holymoderation.config;
 
 import java.nio.file.Path;
+import me.xv.holymoderation.core.ModBuild;
 import net.fabricmc.loader.api.FabricLoader;
 
 public final class PathsConfig {
-   private static final Path ROOT = FabricLoader.getInstance().getConfigDir().resolve("holymoderation");
+   private static final Path ROOT = FabricLoader.getInstance().getConfigDir().resolve(
+      ModBuild.BARE ? "hmclient" : "holymoderation"
+   );
 
    private PathsConfig() {
    }

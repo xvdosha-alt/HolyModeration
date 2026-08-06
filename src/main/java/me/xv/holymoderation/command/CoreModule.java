@@ -1,9 +1,6 @@
 package me.xv.holymoderation.command;
 
 import java.util.Arrays;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import me.xv.holymoderation.service.NetService;
 import me.xv.holymoderation.config.ModState;
 import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.service.DebugLogService;
@@ -19,7 +16,6 @@ import me.xv.holymoderation.service.StateService;
 import me.xv.holymoderation.service.TabLocationService;
 import me.xv.holymoderation.util.NotificationType;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.GameType;
@@ -44,7 +40,7 @@ public class CoreModule extends BaseCommandHandler {
 
       if (!state.isOnHW()) {
          state.setBlocked(true);
-      } else if (state.getBlocked() && state.getEnabled()) {
+      } else if (state.getEnabled()) {
          state.setBlocked(false);
          this.serviceContext.getEventBus().post(event);
       }
@@ -120,7 +116,7 @@ public class CoreModule extends BaseCommandHandler {
 
       if (parts.length == 1) {
          this.serviceContext.getChatService().sendMessage(
-            Component.literal("§eHolyModeration: §6/hm enable§f, §6/hm stats§f, §6/hm setvk <vk.com/id>§f, §6/hm setapitoken <token>")
+            Component.literal("§eHolyModeration: §6/hm enable§f, §6/hm setvk <vk.com/id>§f, §6/hm frz <ник>")
          );
          return;
       }
@@ -370,58 +366,7 @@ public class CoreModule extends BaseCommandHandler {
    }
 
    private void handleSetApiTokenCommand(String[] parts) {
-      if (parts.length < 3) {
-         this.showError("Вы не ввели API ключ.");
-         return;
-      }
-
-      String token = NetService.sanitizeApiToken(String.join(" ", Arrays.copyOfRange(parts, 2, parts.length)));
-      if (token.isBlank()) {
-         this.showError("Вы не ввели API ключ.");
-         return;
-      }
-
-      this.serviceContext.getNotificationService().showToast(
-         NotificationType.WARNING,
-         "§6§lПроверка",
-         "Проверяю API ключ журнала...",
-         5.0F
-      );
-
-      CompletableFuture.runAsync(() -> {
-         boolean valid = this.serviceContext.getNetService().validateApiToken(token);
-         Minecraft client = this.serviceContext.getMinecraftService().getClient();
-         client.execute(() -> {
-            if (!valid) {
-               this.showError(
-                  "API ключ не принят журналом (401). Открой journal.holyworld.me/api, нажми copy у поля «Ваш API ключ» и вставь его в /hm setapitoken. Не используй auth_token из cookies."
-               );
-               return;
-            }
-
-            ModState modState = this.serviceContext.getConfigManager().getState();
-            modState.setApiToken(token);
-            this.serviceContext.getConfigManager().save(modState);
-            this.serviceContext.getStateService().setBlocked(false);
-            this.serviceContext.getNotificationService().showToast(
-               NotificationType.SUCCESS,
-               "§a§lУспех",
-               "API ключ сохранён. Перезайди на сервер.",
-               8.0F
-            );
-            this.serviceContext.getChatService().sendMessage(Component.literal("§aAPI ключ сохранён. Перезайди на сервер."));
-            this.serviceContext.getSoundService().playSound("success.wav");
-
-            CompletableFuture.delayedExecutor(2L, TimeUnit.SECONDS).execute(() -> client.execute(() -> {
-               ClientPacketListener handler = client.getConnection();
-               if (handler != null) {
-                  handler.getConnection().disconnect(
-                     Component.literal("§b§lВы успешно установили API ключ. Пожалуйста, перезайдите на сервер.")
-                  );
-               }
-            }));
-         });
-      });
+      this.showError("API журнала отключён. Используй §6/hm setvk vk.com/id<номер>§f.");
    }
 
    private void handleSetVkCommand(String[] parts) {

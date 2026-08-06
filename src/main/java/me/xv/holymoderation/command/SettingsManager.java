@@ -284,89 +284,34 @@ public class SettingsManager extends BaseCommandHandler {
    }
 
    private void dispatchSettings() {
-      try {
-         Map<?, ?> profile = this.serviceContext.getStateService().getJournalProfile();
-         String nickname = profile.get("nickname").toString();
-         int rank = (int)Double.parseDouble(profile.get("rank").toString());
-         String rankName = RANKS.get(rank);
-         String fullname = profile.get("fullname").toString();
-         long idVk = (long)Double.parseDouble(profile.get("idVk").toString());
-         int neponyatki = (int)Double.parseDouble(profile.get("neponyatki").toString());
-         int reprimands = (int)Double.parseDouble(profile.get("reprimands").toString());
-         int warns = (int)Double.parseDouble(profile.get("warns").toString());
-         String anarchyMode = String.valueOf(profile.get("anarchyMode"));
-         String message = "§fВаш никнейм: §b§l" + nickname
-            + "\n§fВаша должность: " + rankName
-            + "\n§fВаш вк: §b§l" + fullname + " (§fvk.com/id" + idVk + "§b§l)"
-            + "\n§fВаш баланс: §a§l" + neponyatki
-            + "\n§fКоличество выговоров: §c§l" + reprimands
-            + "\n§fКоличество предупреждений: §6§l" + warns
-            + "\n§fРежим: §e§l" + anarchyMode;
-         this.serviceContext.getNotificationService().showToast(
-            NotificationType.SUCCESS, "§a§lИНФОРМАЦИЯ О МОДЕРАТОРЕ", message, 10.0F
-         );
-      } catch (Exception exception) {
-         this.serviceContext.getNotificationService().showToast(
-            NotificationType.EXCEPTION,
-            "§3§lИсключение",
-            "Исключение в SettingsManager/onMessageSend: §4" + exception,
-            5.0F
-         );
+      String nickname = this.serviceContext.getStateService().getModerNickname();
+      if (nickname.isEmpty()) {
+         var player = this.serviceContext.getMinecraftService().getPlayer();
+         if (player != null) {
+            nickname = player.getName().getString();
+         }
       }
+
+      String vk = this.serviceContext.getStateService().getVkUrl();
+      String message = "§fВаш никнейм: §b§l" + nickname;
+      if (!vk.isEmpty()) {
+         message = message + "\n§fВаш вк: §b§l" + vk;
+      } else {
+         message = message + "\n§fVK не задан. §6/hm setvk vk.com/id<номер>";
+      }
+
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.SUCCESS, "§a§lИНФОРМАЦИЯ О МОДЕРАТОРЕ", message, 10.0F
+      );
    }
 
    private void showModeratorStats() {
-      try {
-         Map<?, ?> stats = this.serviceContext.getStateService().getJournalStats();
-         String message = "";
-
-         Map<?, ?> revisesAll = (Map<?, ?>)stats.get("revisesAll");
-         Map<?, ?> revisesMonth = (Map<?, ?>)stats.get("revisesMonth");
-         Map<?, ?> revisesWeek = (Map<?, ?>)stats.get("revisesWeek");
-         Map<?, ?> revisesToday = (Map<?, ?>)stats.get("revisesToday");
-         if (revisesAll != null && revisesMonth != null && revisesWeek != null && revisesToday != null) {
-            message = "§d§lСТАТИСТИКА ПРОВЕРОК\n§fПроверок за всё время: §b§l"
-               + this.parseStat(revisesAll, "total") + " (лайт: " + this.parseStat(revisesAll, "lite")
-               + ", лайт 1.20: " + this.parseStat(revisesAll, "lite120") + ", классик: " + this.parseStat(revisesAll, "classic")
-               + ", прайм: " + this.parseStat(revisesAll, "prime") + ")\n"
-               + "§fПроверок за последний месяц: §b§l" + this.parseStat(revisesMonth, "total")
-               + " (лайт: " + this.parseStat(revisesMonth, "lite") + ", лайт 1.20: " + this.parseStat(revisesMonth, "lite120")
-               + ", классик: " + this.parseStat(revisesMonth, "classic") + ", прайм: " + this.parseStat(revisesMonth, "prime") + ")\n"
-               + "§fПроверок за последнюю неделю: §b§l" + this.parseStat(revisesWeek, "total")
-               + " (лайт: " + this.parseStat(revisesWeek, "lite") + ", лайт 1.20: " + this.parseStat(revisesWeek, "lite120")
-               + ", классик: " + this.parseStat(revisesWeek, "classic") + ", прайм: " + this.parseStat(revisesWeek, "prime") + ")\n"
-               + "§fПроверок за сегодня: §b§l" + this.parseStat(revisesToday, "total")
-               + " (лайт: " + this.parseStat(revisesToday, "lite") + ", лайт 1.20: " + this.parseStat(revisesToday, "lite120")
-               + ", классик: " + this.parseStat(revisesToday, "classic") + ", прайм: " + this.parseStat(revisesToday, "prime") + ")\n";
-         }
-
-         message = message
-            + "§d§lСТАТИСТИКА МУТОВ И ГАРАНТОВ\n§fМутов за всё время: §b§l" + this.parseStat(stats, "mutesAll")
-            + "\n§fМутов за последний месяц: §b§l" + this.parseStat(stats, "mutesMonth")
-            + "\n§fМутов за сегодня: §b§l" + this.parseStat(stats, "mutesToday")
-            + "\n§fГарантов за всё время: §b§l" + this.parseStat(stats, "gaurantsAll")
-            + "\n§fГарантов за последний месяц: §b§l" + this.parseStat(stats, "gaurantsMonth")
-            + "\n§fГарантов за сегодня: §b§l" + this.parseStat(stats, "gaurantsToday");
-
-         this.serviceContext.getNotificationService().showToast(
-            NotificationType.SUCCESS, "§a§lСТАТИСТИКА МОДЕРАТОРА", message, 10.0F
-         );
-      } catch (Exception exception) {
-         this.serviceContext.getNotificationService().showToast(
-            NotificationType.EXCEPTION,
-            "§3§lИсключение",
-            "Исключение в SettingsManager/onMessageSend: §4" + exception,
-            5.0F
-         );
-      }
-   }
-
-   private int parseStat(Map<?, ?> map, String key) {
-      Object value = map.get(key);
-      if (value == null) {
-         return 0;
-      }
-      return (int)Double.parseDouble(value.toString());
+      this.serviceContext.getNotificationService().showToast(
+         NotificationType.WARNING,
+         "§6§lНедоступно",
+         "Статистика журнала недоступна. API отключён.",
+         8.0F
+      );
    }
 
    private void showSuccess(String message) {

@@ -11,6 +11,9 @@ public class GuiCommandModule extends BaseCommandHandler {
 
    @Subscribe
    public void onGuiRenderHud(RenderHudEvent event) {
+      if (me.xv.holymoderation.core.ModBuild.BARE) {
+         return;
+      }
       if (!this.serviceContext.getKeyBindingService().matchesBinding("open_main_gui")) {
          return;
       }

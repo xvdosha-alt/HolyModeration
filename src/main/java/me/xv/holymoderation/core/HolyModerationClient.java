@@ -54,7 +54,9 @@ public class HolyModerationClient implements ClientModInitializer {
          LoggerFactory.getLogger("HolyModeration/Client")
       );
       this.registerModules();
-      HudPanelDragSetup.register();
+      if (!me.xv.holymoderation.core.ModBuild.BARE) {
+         HudPanelDragSetup.register();
+      }
       ClientCommandRegistrationCallback.EVENT.register(ModCommands::register);
       ServiceRegistry.getDebugLogService().write("system", "log file: " + ServiceRegistry.getDebugLogService().getLogPath());
       ServiceRegistry.getStateService().setVkUrl(ServiceRegistry.getConfigManager().getState().getVkUrl());

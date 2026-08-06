@@ -278,6 +278,9 @@ public class SpyModule extends BaseCommandHandler {
 
    @Subscribe
    public void onSpyRenderHud(RenderHudEvent event) {
+      if (me.xv.holymoderation.core.ModBuild.BARE) {
+         return;
+      }
       this.anim += (this.animTarget - this.anim) * 0.15F;
       if (this.anim < 0.01F && this.display0.isEmpty() && this.display1.isEmpty()) {
          return;

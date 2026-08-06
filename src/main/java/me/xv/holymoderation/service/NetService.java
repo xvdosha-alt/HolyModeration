@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.Map;
 import javax.net.ssl.HttpsURLConnection;
 import me.xv.holymoderation.core.BaseService;
+import me.xv.holymoderation.core.ModBuild;
 import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.util.NotificationType;
 import org.jetbrains.annotations.NotNull;
@@ -23,14 +24,23 @@ public class NetService extends BaseService {
    private final Gson gson = new Gson();
 
    public Map<String, Object> getPlayerHistory() {
+      if (!ModBuild.JOURNAL_API) {
+         return Collections.emptyMap();
+      }
       return this.parsePlayerList("me");
    }
 
    public Map<String, Object> getCheckoutSessions() {
+      if (!ModBuild.JOURNAL_API) {
+         return Collections.emptyMap();
+      }
       return this.parsePlayerList("stats");
    }
 
    public boolean validateApiToken(String token) {
+      if (!ModBuild.JOURNAL_API) {
+         return false;
+      }
       HttpsURLConnection connection = null;
 
       try {
@@ -69,6 +79,10 @@ public class NetService extends BaseService {
    }
 
    public void submitJournalEntry(String username, String reason, String mode, int anarchyNumber, boolean isPvpAnarchy) {
+      if (!ModBuild.JOURNAL_API) {
+         this.journalLog("start skipped: journal api disabled player=" + username + " reason=" + reason);
+         return;
+      }
       JsonObject body = new JsonObject();
       body.addProperty("username", username);
       body.addProperty("reason", reason);
@@ -139,6 +153,10 @@ public class NetService extends BaseService {
    }
 
    public void queueJournalEntry(String result, String banReason, boolean destroyStash) {
+      if (!ModBuild.JOURNAL_API) {
+         this.journalLog("end skipped: journal api disabled result=" + result);
+         return;
+      }
       JsonObject body = new JsonObject();
       body.addProperty("result", result);
       body.addProperty("banReason", banReason);

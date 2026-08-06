@@ -3,6 +3,7 @@ package me.xv.holymoderation.service;
 import java.util.Arrays;
 import java.util.List;
 import me.xv.holymoderation.core.BaseService;
+import me.xv.holymoderation.core.ModBuild;
 import me.xv.holymoderation.core.ServiceRegistry;
 import me.xv.holymoderation.util.NotificationType;
 import net.minecraft.client.Minecraft;
@@ -68,6 +69,9 @@ public class ChatService extends BaseService {
    }
 
    public void sendMessage(Component message) {
+      if (ModBuild.BARE) {
+         return;
+      }
       Minecraft client = ServiceRegistry.getMinecraftService().getClient();
       client.execute(() -> {
          LocalPlayer player = client.player;

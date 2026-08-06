@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "holymoderation",
+  "id": "${mod_id}",
   "version": "${version}",
-  "name": "HolyModeration",
-  "description": "An auxiliary mod for moderation on HolyWorld",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
   "authors": [
     "xv"
   ],

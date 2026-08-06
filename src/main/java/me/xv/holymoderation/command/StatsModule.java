@@ -11,6 +11,9 @@ import net.minecraft.network.chat.Component;
 public class StatsModule extends BaseCommandHandler {
    @Subscribe(priority = 96)
    public void onStatsChatMessage(ChatMessageEvent event) {
+      if (me.xv.holymoderation.core.ModBuild.BARE) {
+         return;
+      }
       Component original = event.getMessage();
       String stripped = CheckoutMarkerService.stripFormatting(original.getString());
       String player = this.serviceContext.getStateService().getPlayer();
